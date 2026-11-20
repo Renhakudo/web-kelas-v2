@@ -170,7 +170,7 @@ function makePanels(data, now = new Date()) {
 
     pengurus() {
       if (data.anggota.error) return gagal(data.anggota.error);
-      const { dosenWali, pengurus } = data.anggota.data;
+      const { dosenWali, pengurus, pengembang } = data.anggota.data;
       // Gabungkan jabatan yang sama (mis. dua sekretaris) dalam satu kartu, urutan dipertahankan
       const grup = [];
       pengurus.forEach((p) => {
@@ -178,9 +178,22 @@ function makePanels(data, now = new Date()) {
         g ? g.nama.push(p.nama) : grup.push({ jabatan: p.jabatan, nama: [p.nama] });
       });
       const cards = grup.map((p, i) => `<div class="officer" style="--i:${i + 1}"><div class="num" aria-hidden="true">${ROMAWI[i] || i + 1}</div><p class="role">${esc(p.jabatan)}</p><p translate="no">${p.nama.map(esc).join("<br>")}</p></div>`).join("");
+
+      // Tim Pengembang Website
+      const devList = pengembang || [
+        { peran: "Frontend & Core Feature", nama: ["Mohammad Aditya Arkoun"], ket: "Arsitektur antarmuka, tata letak interaktif, sistem menu, dan fitur inti website." },
+        { peran: "Backend & Database", nama: ["Muhammad Hilmi Mu'Afa"], ket: "Struktur data, integrasi database & penyimpanan, serta arsitektur backend." },
+        { peran: "Ideas & Support", nama: ["Davin Zoe Akhmad", "Ryandra Alifah Hafizd"], ket: "Konseptualisasi ide, pengujian fitur, dan dukungan pengembangan." }
+      ];
+      const devCards = devList.map((d, i) => {
+        const cls = i === 0 ? "fe" : i === 1 ? "be" : "ideas";
+        const avatars = d.nama.map((n) => `<div class="dev-avatar-row"><span class="dev-avatar" aria-hidden="true">${initials(n)}</span><span translate="no" style="font-weight:600;">${esc(n)}</span></div>`).join("");
+        return `<div class="dev-card ${cls}" style="--i:${i}"><div><span class="dev-role-badge">${esc(d.peran)}</span><div style="margin-top:.6rem;">${avatars}</div></div><p class="dev-desc">${esc(d.ket)}</p></div>`;
+      }).join("");
+
       return {
         sub: "Struktur organisasi kelas",
-        html: `<div class="officer wali" style="--i:0"><div class="num" aria-hidden="true">0</div><p class="role">${esc(dosenWali.jabatan)}</p><p translate="no">${esc(dosenWali.nama)}</p></div><div class="officers">${cards}</div>`
+        html: `<div class="officer wali" style="--i:0"><div class="num" aria-hidden="true">0</div><p class="role">${esc(dosenWali.jabatan)}</p><p translate="no">${esc(dosenWali.nama)}</p></div><div class="officers">${cards}</div><div class="dev-team-section"><div class="dev-team-head"><h3 class="dev-team-title">Tim Pengembang Website</h3><p class="dev-team-sub">Mahasiswa yang membangun &amp; merancang situs ini</p></div><div class="dev-cards">${devCards}</div></div>`
       };
     },
 
@@ -218,6 +231,34 @@ function makePanels(data, now = new Date()) {
         return window.SDT.panelKas(data, subtab, rerender);
       }
       return gagal("Modul pengelola kas belum siap.");
+    },
+
+    kredit() {
+      const devList = (data.anggota && data.anggota.data && data.anggota.data.pengembang) || [
+        { peran: "Frontend & Core Feature", nama: ["Mohammad Aditya Arkoun"], ket: "Arsitektur antarmuka, tata letak interaktif, sistem navigasi menu, pemutar musik, dan fitur inti website." },
+        { peran: "Backend & Database", nama: ["Muhammad Hilmi Mu'Afa"], ket: "Struktur data, integrasi database & penyimpanan, serta arsitektur backend." },
+        { peran: "Ideas & Support", nama: ["Davin Zoe Akhmad", "Ryandra Alifah Hafizd"], ket: "Konseptualisasi ide, pengujian fitur, evaluasi kebutuhan kelas, dan dukungan pengembangan." }
+      ];
+      const cards = devList.map((d, i) => {
+        const cls = i === 0 ? "fe" : i === 1 ? "be" : "ideas";
+        const avatars = d.nama.map((n) => `<div class="dev-avatar-row"><span class="dev-avatar" aria-hidden="true">${initials(n)}</span><span translate="no" style="font-weight:600;">${esc(n)}</span></div>`).join("");
+        return `<div class="dev-card ${cls}" style="--i:${i}"><div><span class="dev-role-badge">${esc(d.peran)}</span><div style="margin-top:.6rem;">${avatars}</div></div><p class="dev-desc">${esc(d.ket)}</p></div>`;
+      }).join("");
+
+      return {
+        sub: "Tim pengembang website kelas",
+        html: `
+          <div class="dev-team-head" style="margin-bottom:1.25rem;">
+            <h3 class="dev-team-title" style="font-size:1.6rem;">Kredit Pembuatan Website</h3>
+            <p class="dev-team-sub">Dirancang dan dibangun oleh mahasiswa Sains Data Terapan A</p>
+          </div>
+          <div class="dev-cards">${cards}</div>
+          <div class="credits-footer">
+            <p>Sains Data Terapan A &bull; Politeknik Elektronika Negeri Surabaya</p>
+            <span>Dibuat dengan dedikasi untuk memudahkan kegiatan dan perkuliahan seluruh rekan kelas.</span>
+          </div>
+        `
+      };
     }
   };
 }

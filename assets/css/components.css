@@ -149,6 +149,31 @@ body.open .menu, body.open .command { opacity: .25; }
 .wali .num { -webkit-text-stroke-color: var(--sea); }
 .wali .role { color: var(--red-strong); }
 
+/* Tim Pengembang & Kredit Website */
+.dev-team-section { margin-top: 2rem; padding-top: 1.5rem; border-top: 2px dashed var(--edge-soft); }
+.dev-team-head { margin-bottom: 1.1rem; }
+.dev-team-title { margin: 0; font: italic 900 1.45rem/1.1 var(--display); text-transform: uppercase; color: var(--aqua); letter-spacing: -.02em; }
+.dev-team-sub { margin: .25rem 0 0; font: 500 .74rem/1.3 var(--mono); color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+.dev-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: .85rem; }
+.dev-card { position: relative; padding: 1.2rem 1.1rem; background: var(--card); border: 2px solid var(--edge); display: flex; flex-direction: column; justify-content: space-between; gap: .75rem; animation: rise .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.dev-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--aqua); }
+.dev-card.fe::before { background: var(--aqua); }
+.dev-card.be::before { background: #4dfba7; }
+.dev-card.ideas::before { background: #ffb3ba; }
+.dev-role-badge { display: inline-block; padding: .2rem .55rem; background: var(--ink); color: var(--foam); font: 700 .65rem/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); width: fit-content; }
+.dev-avatar-row { display: flex; align-items: center; gap: .55rem; margin-top: .4rem; }
+.dev-avatar { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; background: var(--foam); color: var(--ink); font: italic 900 .85rem/1 var(--display); clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%); flex: none; }
+.dev-card.fe .dev-avatar { background: var(--aqua); }
+.dev-card.be .dev-avatar { background: #4dfba7; }
+.dev-card.ideas .dev-avatar { background: #ffb3ba; }
+.dev-desc { margin: 0; font: 500 .8rem/1.4 var(--sans); color: var(--text-dim); }
+.credits-footer { margin-top: 1.8rem; padding: 1rem 1.2rem; background: rgba(143, 240, 255, .08); border: 1px solid var(--edge-soft); text-align: center; }
+.credits-footer p { margin: 0; font: italic 900 .95rem/1.4 var(--display); color: var(--text); text-transform: uppercase; letter-spacing: .02em; }
+.credits-footer span { display: block; margin-top: .3rem; font: 500 .74rem/1.3 var(--mono); color: var(--text-dim); }
+.set-credits-box { margin-top: 1.2rem; padding: 1.1rem; background: var(--card); border: 2px solid var(--edge); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.set-credits-title { margin: 0 0 .25rem; font: italic 900 1.05rem/1 var(--display); text-transform: uppercase; color: var(--aqua); }
+.set-credits-desc { margin: 0; font: 500 .78rem/1.3 var(--mono); color: var(--text-dim); }
+
 .empty { padding: 2.5rem 1.5rem; background: var(--card); border: 2px dashed var(--edge); text-align: center; }
 .empty b { display: block; font: italic 900 1.6rem/1.1 var(--display); text-transform: uppercase; }
 .empty p { margin: .6rem auto 0; max-width: 28rem; color: var(--text-dim); font-size: .9rem; line-height: 1.5; }
@@ -206,8 +231,11 @@ body.open .menu, body.open .command { opacity: .25; }
 .error b { display: block; font: italic 900 1.3rem/1.1 var(--display); text-transform: uppercase; }
 .error p { margin: .5rem 0 0; font-size: .9rem; }
 
-/* Tombol diamkan latar (WCAG 2.2.2: gerak dekoratif bisa dihentikan) */
-.motion { position: fixed; z-index: 4; top: calc(clamp(.75rem, 2.5vh, 1.5rem) + env(safe-area-inset-top, 0px)); right: calc(clamp(.75rem, 2vw, 1.5rem) + env(safe-area-inset-right, 0px)); display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .75rem; border: 2px solid var(--paper); background: rgba(4, 18, 96, .35); color: var(--paper); cursor: pointer; font: italic 800 .9rem/1 var(--display); transform: skewX(-10deg); transition: background-color .15s var(--ease); }
+/* Tombol aksi atas (Kredit & Pengaturan) */
+.top-actions { position: fixed; z-index: 4; top: calc(clamp(.75rem, 2.5vh, 1.5rem) + env(safe-area-inset-top, 0px)); right: calc(clamp(.75rem, 2vw, 1.5rem) + env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: .45rem; }
+.top-actions .motion { position: static; }
+body.open .top-actions { opacity: .25; pointer-events: none; }
+.motion { display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .75rem; border: 2px solid var(--paper); background: rgba(4, 18, 96, .35); color: var(--paper); cursor: pointer; font: italic 800 .9rem/1 var(--display); transform: skewX(-10deg); transition: background-color .15s var(--ease); }
 .motion > * { transform: skewX(10deg); }
 @media (hover: hover) and (pointer: fine) { .motion:hover { background: rgba(4, 18, 96, .6); } }
 body.open .motion { opacity: .25; }

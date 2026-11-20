@@ -32,6 +32,30 @@ window.DATA.anggota = {
       "nama": "Fauzan Aqeelah Ghazi Rabbani"
     }
   ],
+  "pengembang": [
+    {
+      "peran": "Frontend & Core Feature",
+      "nama": [
+        "Mohammad Aditya Arkoun"
+      ],
+      "ket": "Arsitektur antarmuka, tata letak interaktif, sistem navigasi menu, pemutar musik, dan fitur inti website."
+    },
+    {
+      "peran": "Backend & Database",
+      "nama": [
+        "Muhammad Hilmi Mu'Afa"
+      ],
+      "ket": "Struktur data, integrasi database & penyimpanan, serta manajemen arsitektur backend."
+    },
+    {
+      "peran": "Ideas & Support",
+      "nama": [
+        "Davin Zoe Akhmad",
+        "Ryandra Alifah Hafizd"
+      ],
+      "ket": "Konseptualisasi ide, pengujian fitur, evaluasi kebutuhan kelas, dan dukungan pengembangan."
+    }
+  ],
   "mahasiswa": [
     "Rihana Shafira Azzalia",
     "Ryandra Alifah Hafizd",

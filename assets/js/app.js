@@ -14,8 +14,9 @@ const MENU = [
   { key: "tautan", label: "Tautan", desc: "Tautan penting kelas", r: 12, x: 3.5 }
 ];
 
-// Pengaturan dibuka dari tombol kanan atas, bukan dari menu
+// Pengaturan dan Kredit dibuka dari tombol kanan atas, bukan dari menu
 const PENGATURAN = { key: "pengaturan", label: "Pengaturan" };
+const KREDIT = { key: "kredit", label: "Kredit" };
 
 const $ = (s) => document.querySelector(s);
 // Mengubah alamat (tautan langsung) tanpa memuat ulang. Di lingkungan tertentu
@@ -69,7 +70,7 @@ items.forEach((el, i) => {
 
 // ---------- Panel ----------
 function show(key, arg) {
-  const m = MENU.find((x) => x.key === key) || PENGATURAN;
+  const m = MENU.find((x) => x.key === key) || (key === KREDIT.key ? KREDIT : PENGATURAN);
   $("#panel-title").textContent = m.label;
   $("#panel-head").dataset.ghost = m.label;
   fitTitle();
@@ -130,6 +131,7 @@ function fromHash() {
     return;
   }
   if (key === PENGATURAN.key) { openPanel(key, settingsBtn); return; }
+  if (key === KREDIT.key || key === "credit") { openPanel(KREDIT.key, creditsBtn); return; }
   // Tautan lama #kalender: kalender kini tab di panel Jadwal
   if (key === "kalender") { select(0, false); openPanel("jadwal"); show("jadwal", "kalender"); return; }
   if (key === "kas" || key.startsWith("kas/")) {
@@ -182,12 +184,23 @@ SETELAN.forEach((s) => {
   document.body.classList.toggle(s.kelas, on);
 });
 const settingsBtn = $("#settings");
+const creditsBtn = $("#credits");
 settingsBtn.addEventListener("click", () => openPanel(PENGATURAN.key, settingsBtn));
+if (creditsBtn) creditsBtn.addEventListener("click", () => openPanel(KREDIT.key, creditsBtn));
 const teks = (on) => (on ? "Nyala" : "Mati");
 function panelPengaturan() {
   return {
     sub: "Disimpan di peramban ini",
-    html: `<ul class="list set">${SETELAN.map((s, i) => `<li style="--i:${i}"><div><h3 id="set-${s.kelas}">${s.label}</h3><p>${s.ket}</p></div><button type="button" class="switch" role="switch" data-kelas="${s.kelas}" aria-labelledby="set-${s.kelas}" aria-checked="${document.body.classList.contains(s.kelas)}">${teks(document.body.classList.contains(s.kelas))}</button></li>`).join("")}</ul>`,
+    html: `
+      <ul class="list set">${SETELAN.map((s, i) => `<li style="--i:${i}"><div><h3 id="set-${s.kelas}">${s.label}</h3><p>${s.ket}</p></div><button type="button" class="switch" role="switch" data-kelas="${s.kelas}" aria-labelledby="set-${s.kelas}" aria-checked="${document.body.classList.contains(s.kelas)}">${teks(document.body.classList.contains(s.kelas))}</button></li>`).join("")}</ul>
+      <div class="set-credits-box">
+        <div>
+          <h3 class="set-credits-title">Kredit Pembuat Website</h3>
+          <p class="set-credits-desc">Dikembangkan oleh mahasiswa Sains Data Terapan A</p>
+        </div>
+        <button type="button" class="kas-btn kas-btn-sm" id="btn-goto-credits"><span>Lihat Tim Pengembang &rarr;</span></button>
+      </div>
+    `,
     after(el) {
       el.querySelectorAll(".switch").forEach((b) => b.addEventListener("click", () => {
         const on = b.getAttribute("aria-checked") !== "true";
@@ -195,6 +208,9 @@ function panelPengaturan() {
         b.setAttribute("aria-checked", String(on));
         b.textContent = teks(on);
       }));
+      el.querySelector("#btn-goto-credits")?.addEventListener("click", () => {
+        openPanel(KREDIT.key, creditsBtn);
+      });
     }
   };
 }
