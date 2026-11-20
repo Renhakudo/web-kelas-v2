@@ -1,0 +1,40 @@
+/* tokens.css: semua nilai warna, huruf, dan gerak. Ubah tampilan dari sini. */
+
+/* Huruf P3R (folder Fonts/), dikecilkan ke huruf Latin saja. Bobot ditulis sesuai berkas agar peramban tidak menebalkan lagi. */
+@font-face { font-family: "NewRodin"; src: url("../fonts/newrodin-eb.woff2") format("woff2"); font-weight: 800 900; font-display: swap; }
+@font-face { font-family: "Rodin"; src: url("../fonts/rodin-db.woff2") format("woff2"); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: "Skip"; src: url("../fonts/skip-b.woff2") format("woff2"); font-weight: 400 700; font-display: swap; unicode-range: U+0020-007E, U+00A0-00FF, U+2013-201D; /* tanpa "…": di huruf ini titiknya melayang di tengah */ }
+@font-face { font-family: "BM Space"; src: url("../fonts/bmspa.woff2") format("woff2"); font-display: swap; }
+
+:root {
+  --sea: #0d3fe6;
+  --sea-deep: #0a2bb0;
+  --sea-light: #1aa6ff;
+  --foam: #8ff0ff;
+  --ink: #0a0b1a;
+  --paper: #ffffff;
+  --paper-2: #f2f5ff;
+  --red: #ff2033;
+  --red-strong: #d90016; /* untuk teks kecil putih di atas merah (kontras 5.3:1) */
+  --aqua: #54edea;  /* aksen kedua: biru kehijauan air, merah hanya untuk kursor */
+  --idle: #68e8fc;   /* menu tidak terpilih: dua rona sian ala P3R bergantian */
+  --idle-2: #0bc8ff;
+  --idle-shadow: rgba(4, 18, 96, 0.9);
+  --line: #d7def2;
+  --muted: #59627e;
+  /* Panel: biru laut; body.navy (Pengaturan) menggantinya dengan biru tua */
+  --panel: var(--sea);
+  --card: var(--sea-deep);
+  --text: #eaf4ff;
+  --text-dim: #d3e0ff;
+  --edge: rgba(143, 240, 255, .45);
+  --edge-soft: rgba(143, 240, 255, .2);
+  --display: "NewRodin", "Arial Black", "Helvetica Neue", sans-serif;   /* menu, judul, jam */
+  --sans: "Skip", "Geist", "Helvetica Neue", Arial, sans-serif;          /* isi panel */
+  --mono: "Rodin", "Geist Mono", ui-monospace, monospace;                /* label kecil */
+  --pixel: "BM Space", "Geist Mono", ui-monospace, monospace;            /* tombol keyboard */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Halaman baca dan sunting rangkuman bergaya Notion: tetap Geist agar tebal-tipis dan kode terbaca */
+.np { --sans: "Geist", "Helvetica Neue", Arial, sans-serif; --mono: "Geist Mono", ui-monospace, monospace; --pixel: var(--mono); }

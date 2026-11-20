@@ -1,0 +1,779 @@
+/* kas.css: Gaya tampilan fitur Pengelola Kas Kelas Sains Data Terapan A */
+
+/* Ringkasan Saldo di bagian atas panel */
+.kas-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: .6rem;
+  margin-bottom: 1.2rem;
+}
+
+.kas-card {
+  position: relative;
+  background: var(--card);
+  border: 2px solid var(--edge);
+  padding: .75rem .9rem;
+  overflow: hidden;
+  animation: rise .35s var(--ease) both;
+}
+
+.kas-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--edge);
+}
+
+.kas-card.main::after { background: var(--aqua); }
+.kas-card.in::after { background: #4dfba7; }
+.kas-card.out::after { background: var(--red); }
+.kas-card.rate::after { background: var(--foam); }
+
+.kas-card-label {
+  display: block;
+  font: 500 .62rem/1.2 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  margin-bottom: .3rem;
+}
+
+.kas-card-val {
+  font: italic 900 1.25rem/1 var(--display);
+  letter-spacing: -.02em;
+  color: var(--paper);
+}
+
+.kas-card.main .kas-card-val {
+  color: var(--aqua);
+  font-size: 1.4rem;
+}
+
+.kas-card.in .kas-card-val { color: #4dfba7; }
+.kas-card.out .kas-card-val { color: #ff8591; }
+
+.kas-card-sub {
+  margin: .35rem 0 0;
+  font: 500 .68rem/1.2 var(--mono);
+  color: var(--text-dim);
+}
+
+/* Navigasi Subtab Kas */
+.kas-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .4rem;
+  margin-bottom: 1.25rem;
+  padding-right: .6rem;
+}
+
+/* Toolbar & Filter Bar */
+.kas-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.kas-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.kas-chip {
+  padding: .35rem .65rem;
+  border: 1px solid var(--edge);
+  background: var(--card);
+  color: var(--text-dim);
+  font: 500 .72rem/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  cursor: pointer;
+  transform: skewX(-10deg);
+  transition: all .15s var(--ease);
+}
+
+.kas-chip > * { transform: skewX(10deg); display: inline-block; }
+
+.kas-chip:hover {
+  background: var(--sea-deep);
+  color: var(--paper);
+}
+
+.kas-chip.active {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 2px 2px 0 var(--aqua);
+}
+
+.kas-actions {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+
+/* Tombol Aksi */
+.kas-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .5rem .85rem;
+  border: 2px solid var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+  font: italic 800 .82rem/1 var(--display);
+  text-transform: uppercase;
+  cursor: pointer;
+  transform: skewX(-10deg);
+  transition: transform .12s var(--ease), background .15s var(--ease), color .15s var(--ease);
+}
+
+.kas-btn > * { transform: skewX(10deg); }
+
+.kas-btn:hover {
+  background: var(--aqua);
+  border-color: var(--aqua);
+  color: var(--ink);
+}
+
+.kas-btn:active {
+  transform: skewX(-10deg) scale(.96);
+}
+
+.kas-btn-primary {
+  background: var(--red-strong);
+  border-color: var(--red-strong);
+  color: var(--paper);
+}
+
+.kas-btn-primary:hover {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--paper);
+}
+
+.kas-btn-wa {
+  background: #128c7e;
+  border-color: #25d366;
+  color: #ffffff;
+}
+
+.kas-btn-wa:hover {
+  background: #25d366;
+  border-color: #25d366;
+  color: #073523;
+}
+
+.kas-btn-sm {
+  padding: .3rem .55rem;
+  font-size: .72rem;
+}
+
+.kas-btn-outline {
+  background: transparent;
+  color: var(--paper);
+  border-color: var(--edge);
+}
+
+.kas-btn-outline:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Formulir Catat Transaksi Baru */
+.kas-form-card {
+  background: rgba(10, 43, 176, .85);
+  border: 2px solid var(--aqua);
+  padding: 1.1rem;
+  margin-bottom: 1.2rem;
+  animation: rise .3s var(--ease) both;
+}
+
+.kas-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .9rem;
+  border-bottom: 1px solid var(--edge-soft);
+  padding-bottom: .5rem;
+}
+
+.kas-form-head h3 {
+  margin: 0;
+  font: italic 900 1.15rem/1 var(--display);
+  text-transform: uppercase;
+  color: var(--aqua);
+}
+
+.kas-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+  margin-bottom: .9rem;
+}
+
+.kas-field {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.kas-field label {
+  font: 500 .68rem/1 var(--mono);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: .05em;
+}
+
+.kas-input, .kas-select {
+  width: 100%;
+  padding: .55rem .7rem;
+  border: 1px solid var(--edge);
+  background: var(--card);
+  color: var(--paper);
+  font: 500 .88rem var(--sans);
+  border-radius: 0;
+}
+
+.kas-select option {
+  background: var(--sea-deep);
+  color: var(--paper);
+}
+
+.kas-input:focus, .kas-select:focus {
+  outline: 2px solid var(--foam);
+  border-color: var(--foam);
+}
+
+.kas-form-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+}
+
+/* Daftar Mutasi Transaksi */
+.kas-trx-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--card);
+  border: 2px solid var(--edge);
+}
+
+.kas-trx-item {
+  display: grid;
+  grid-template-columns: 85px 1fr auto auto;
+  align-items: center;
+  gap: .8rem;
+  padding: .85rem 1rem;
+  border-left: 5px solid transparent;
+  animation: rise .3s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  transition: transform .15s var(--ease), border-color .15s;
+}
+
+.kas-trx-item + .kas-trx-item {
+  border-top: 1px solid var(--edge-soft);
+}
+
+.kas-trx-item:hover {
+  transform: translateX(3px);
+}
+
+.kas-trx-item.in {
+  border-left-color: #4dfba7;
+}
+
+.kas-trx-item.out {
+  border-left-color: var(--red);
+}
+
+.kas-trx-date {
+  font: 500 .78rem/1.3 var(--mono);
+  color: var(--text-dim);
+}
+
+.kas-badge {
+  display: inline-block;
+  margin-top: .2rem;
+  padding: .12rem .4rem;
+  font: 500 .58rem/1.2 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+
+.kas-badge.in { background: #00874c; color: #ffffff; }
+.kas-badge.out { background: var(--red-strong); color: #ffffff; }
+
+.kas-trx-desc h4 {
+  margin: 0;
+  font: 600 .95rem/1.3 var(--sans);
+  color: var(--paper);
+}
+
+.kas-trx-desc p {
+  margin: .2rem 0 0;
+  font: 500 .75rem/1.2 var(--mono);
+  color: var(--text-dim);
+}
+
+.kas-trx-amount {
+  font: italic 900 1.05rem/1 var(--display);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.kas-trx-amount.in { color: #4dfba7; }
+.kas-trx-amount.out { color: #ff8591; }
+
+.kas-btn-del {
+  background: transparent;
+  border: 1px solid rgba(255, 32, 51, .35);
+  color: #ff8591;
+  cursor: pointer;
+  padding: .3rem .45rem;
+  font: 500 .7rem/1 var(--mono);
+  transition: all .15s;
+}
+
+.kas-btn-del:hover {
+  background: var(--red);
+  color: var(--paper);
+  border-color: var(--red);
+}
+
+/* Tab Iuran: Target Control Bar */
+.kas-target-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  background: var(--card);
+  border: 2px solid var(--edge);
+  padding: .8rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.kas-target-info h3 {
+  margin: 0;
+  font: italic 900 1.15rem/1.1 var(--display);
+  text-transform: uppercase;
+  color: var(--aqua);
+}
+
+.kas-target-info p {
+  margin: .25rem 0 0;
+  font: 500 .75rem/1.3 var(--mono);
+  color: var(--text-dim);
+}
+
+.kas-target-stepper {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.kas-stepper-btn {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--edge);
+  background: var(--sea-deep);
+  color: var(--paper);
+  font: italic 900 1.1rem/1 var(--display);
+  cursor: pointer;
+}
+
+.kas-stepper-btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.kas-stepper-val {
+  min-width: 2.2rem;
+  text-align: center;
+  font: italic 900 1.2rem/1 var(--display);
+  color: var(--paper);
+}
+
+/* Grid Mahasiswa Iuran */
+.kas-iuran-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: .65rem;
+}
+
+.kas-mhs-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--edge-soft);
+  padding: .75rem .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  animation: rise .3s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 15ms);
+  transition: transform .15s var(--ease), border-color .15s;
+}
+
+.kas-mhs-card:hover {
+  border-color: var(--edge);
+  transform: translateY(-2px);
+}
+
+.kas-mhs-card.lunas {
+  border-left: 4px solid var(--aqua);
+}
+
+.kas-mhs-card.nunggak {
+  border-left: 4px solid var(--red);
+}
+
+.kas-mhs-head {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+.kas-mhs-name {
+  font: 600 .88rem/1.3 var(--sans);
+  color: var(--paper);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kas-mhs-status {
+  font: 500 .62rem/1 var(--mono);
+  padding: .15rem .45rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.kas-mhs-status.lunas {
+  background: var(--aqua);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.kas-mhs-status.nunggak {
+  background: var(--red-strong);
+  color: #ffffff;
+}
+
+.kas-mhs-progress {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.kas-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font: 500 .68rem/1 var(--mono);
+  color: var(--text-dim);
+}
+
+.kas-bar-bg {
+  height: 6px;
+  background: rgba(255, 255, 255, .12);
+  overflow: hidden;
+}
+
+.kas-bar-fill {
+  height: 100%;
+  background: var(--aqua);
+  transition: width .3s var(--ease);
+}
+
+.kas-mhs-card.nunggak .kas-bar-fill {
+  background: #ffb3ba;
+}
+
+.kas-mhs-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: .15rem;
+  padding-top: .4rem;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.kas-mhs-btns {
+  display: flex;
+  gap: .3rem;
+}
+
+.kas-btn-micro {
+  padding: .2rem .45rem;
+  font: 600 .68rem/1 var(--mono);
+  background: var(--sea-deep);
+  border: 1px solid var(--edge);
+  color: var(--paper);
+  cursor: pointer;
+  transition: all .1s;
+}
+
+.kas-btn-micro:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Tab Rekening & Cara Bayar */
+.kas-rek-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: .9rem;
+  margin-bottom: 1.25rem;
+}
+
+.kas-rek-card {
+  position: relative;
+  background: linear-gradient(135deg, var(--card) 0%, #081d77 100%);
+  border: 2px solid var(--edge);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  animation: rise .35s var(--ease) both;
+}
+
+.kas-rek-badge {
+  align-self: flex-start;
+  padding: .25rem .6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: italic 900 .85rem/1 var(--display);
+  text-transform: uppercase;
+  transform: skewX(-10deg);
+  margin-bottom: .75rem;
+}
+
+.kas-rek-badge > span { transform: skewX(10deg); display: block; }
+
+.kas-rek-num {
+  font: 700 1.2rem/1.2 var(--mono);
+  letter-spacing: .08em;
+  color: var(--foam);
+  margin: .3rem 0;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.kas-rek-holder {
+  font: 500 .78rem/1.3 var(--mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin: 0 0 .75rem;
+}
+
+.kas-qris-card {
+  background: var(--card);
+  border: 2px solid var(--edge);
+  padding: 1.2rem;
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 1.2rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.kas-qris-visual {
+  width: 140px;
+  height: 140px;
+  background: #ffffff;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+}
+
+.kas-qris-visual svg {
+  width: 100%;
+  height: 100%;
+}
+
+.kas-qris-info h3 {
+  margin: 0 0 .3rem;
+  font: italic 900 1.25rem/1.1 var(--display);
+  text-transform: uppercase;
+  color: var(--aqua);
+}
+
+.kas-qris-info p {
+  margin: .25rem 0 0;
+  font: 500 .82rem/1.4 var(--sans);
+  color: var(--text-dim);
+}
+
+.kas-guide-box {
+  background: rgba(143, 240, 255, .08);
+  border: 1px solid var(--edge);
+  padding: .9rem 1.1rem;
+}
+
+.kas-guide-box h4 {
+  margin: 0 0 .4rem;
+  font: italic 900 .95rem/1 var(--display);
+  color: var(--foam);
+  text-transform: uppercase;
+}
+
+.kas-guide-box ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  font: 500 .84rem/1.5 var(--sans);
+  color: var(--text);
+}
+
+.kas-guide-box code {
+  background: var(--panel);
+  padding: .1rem .4rem;
+  font: 500 .8rem var(--mono);
+  color: var(--aqua);
+}
+
+/* Tab Laporan & Statistik */
+.kas-stats-section {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.kas-stats-card {
+  background: var(--card);
+  border: 2px solid var(--edge);
+  padding: 1.1rem;
+}
+
+.kas-stats-card h3 {
+  margin: 0 0 .9rem;
+  font: italic 900 1.15rem/1 var(--display);
+  text-transform: uppercase;
+  color: var(--aqua);
+}
+
+.kas-cat-bars {
+  display: grid;
+  gap: .75rem;
+}
+
+.kas-cat-row {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.kas-cat-head {
+  display: flex;
+  justify-content: space-between;
+  font: 500 .75rem/1 var(--mono);
+}
+
+.kas-cat-head b { color: var(--paper); }
+.kas-cat-head span { color: var(--text-dim); }
+
+.kas-cat-bar-bg {
+  height: 8px;
+  background: rgba(255, 255, 255, .1);
+}
+
+.kas-cat-bar-fill {
+  height: 100%;
+  background: var(--red);
+  transition: width .4s var(--ease);
+}
+
+.kas-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 .85rem/1.4 var(--mono);
+}
+
+.kas-summary-table tr {
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.kas-summary-table td {
+  padding: .5rem 0;
+}
+
+.kas-summary-table td:last-child {
+  text-align: right;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+/* Toast Notifikasi */
+.kas-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(50px);
+  background: var(--ink);
+  color: var(--paper);
+  border: 2px solid var(--aqua);
+  padding: .6rem 1.2rem;
+  font: italic 800 .85rem/1.2 var(--display);
+  text-transform: uppercase;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .25s var(--ease), opacity .25s;
+}
+
+.kas-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* Responsif Layar Kecil */
+@media (max-width: 760px) {
+  .kas-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .kas-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+  .kas-trx-item {
+    grid-template-columns: 75px 1fr auto;
+  }
+  .kas-btn-del {
+    grid-column: 3;
+    grid-row: 2;
+    margin-top: .2rem;
+  }
+  .kas-qris-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .kas-target-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .kas-target-stepper {
+    justify-content: space-between;
+  }
+  .kas-actions {
+    width: 100%;
+  }
+  .kas-btn-wa {
+    width: 100%;
+  }
+}
