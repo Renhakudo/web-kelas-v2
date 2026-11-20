@@ -14,9 +14,11 @@ const MENU = [
   { key: "tautan", label: "Tautan", desc: "Tautan penting kelas", r: 12, x: 3.5 }
 ];
 
-// Pengaturan dan Kredit dibuka dari tombol kanan atas, bukan dari menu
+// Pengaturan, Kredit, dan Autentikasi dibuka dari tombol kanan atas, bukan dari menu
 const PENGATURAN = { key: "pengaturan", label: "Pengaturan" };
 const KREDIT = { key: "kredit", label: "Kredit" };
+const MASUK = { key: "masuk", label: "Masuk" };
+const PROFIL = { key: "profil", label: "Profil Saya" };
 
 const $ = (s) => document.querySelector(s);
 // Mengubah alamat (tautan langsung) tanpa memuat ulang. Di lingkungan tertentu
@@ -70,7 +72,8 @@ items.forEach((el, i) => {
 
 // ---------- Panel ----------
 function show(key, arg) {
-  const m = MENU.find((x) => x.key === key) || (key === KREDIT.key ? KREDIT : PENGATURAN);
+  const m = MENU.find((x) => x.key === key) ||
+    (key === KREDIT.key ? KREDIT : key === MASUK.key ? MASUK : key === PROFIL.key ? PROFIL : PENGATURAN);
   $("#panel-title").textContent = m.label;
   $("#panel-head").dataset.ghost = m.label;
   fitTitle();
@@ -132,6 +135,15 @@ function fromHash() {
   }
   if (key === PENGATURAN.key) { openPanel(key, settingsBtn); return; }
   if (key === KREDIT.key || key === "credit") { openPanel(KREDIT.key, creditsBtn); return; }
+  if (key === "masuk" || key === "login") {
+    const isLog = window.SDT.auth && window.SDT.auth.state && window.SDT.auth.state.isLoggedIn;
+    openPanel(isLog ? PROFIL.key : MASUK.key, authBtn);
+    return;
+  }
+  if (key === "profil" || key === "profile" || key === "akun") {
+    openPanel(PROFIL.key, authBtn);
+    return;
+  }
   // Tautan lama #kalender: kalender kini tab di panel Jadwal
   if (key === "kalender") { select(0, false); openPanel("jadwal"); show("jadwal", "kalender"); return; }
   if (key === "kas" || key.startsWith("kas/")) {
@@ -185,8 +197,34 @@ SETELAN.forEach((s) => {
 });
 const settingsBtn = $("#settings");
 const creditsBtn = $("#credits");
+const authBtn = $("#auth-btn");
+
 settingsBtn.addEventListener("click", () => openPanel(PENGATURAN.key, settingsBtn));
 if (creditsBtn) creditsBtn.addEventListener("click", () => openPanel(KREDIT.key, creditsBtn));
+if (authBtn) {
+  authBtn.addEventListener("click", () => {
+    const isLog = window.SDT.auth && window.SDT.auth.state && window.SDT.auth.state.isLoggedIn;
+    openPanel(isLog ? PROFIL.key : MASUK.key, authBtn);
+  });
+}
+
+// Reaktif: perbarui tombol auth di pojok kanan atas saat status login berubah
+if (window.SDT && window.SDT.auth && window.SDT.auth.onAuthChange) {
+  window.SDT.auth.onAuthChange((st) => {
+    if (!authBtn) return;
+    const labelSpan = authBtn.querySelector("span");
+    if (!labelSpan) return;
+    if (st.isLoggedIn && st.profile) {
+      authBtn.classList.add("logged-in");
+      const shortName = (st.profile.nama_lengkap || "User").split(" ")[0];
+      const roleCls = st.role === "admin" ? "admin" : "";
+      labelSpan.innerHTML = `&#128100; ${esc(shortName)}<span class="role-pill ${roleCls}">${esc(st.role.toUpperCase())}</span>`;
+    } else {
+      authBtn.classList.remove("logged-in");
+      labelSpan.innerHTML = "Masuk";
+    }
+  });
+}
 const teks = (on) => (on ? "Nyala" : "Mati");
 function panelPengaturan() {
   return {

@@ -259,6 +259,300 @@ function makePanels(data, now = new Date()) {
           </div>
         `
       };
+    },
+
+    masuk(arg, rerender) {
+      const auth = window.SDT && window.SDT.auth;
+      if (auth && auth.state && auth.state.isLoggedIn) {
+        return this.profil(arg, rerender);
+      }
+
+      const isConfigured = window.SDT && window.SDT.appwrite && window.SDT.appwrite.isConfigured;
+
+      const html = `
+        <div class="auth-card">
+          <h3>Autentikasi Internal Kelas SDT A</h3>
+          <p>Masuk menggunakan NIM atau Email kampus untuk mengakses hak akses pengurus dan profil.</p>
+
+          ${!isConfigured ? `
+            <div class="auth-notice" style="margin-bottom:1.2rem; padding:.85rem 1rem; background:rgba(84,237,234,.08); border:1px solid var(--edge);">
+              <b style="color:var(--aqua); display:block; margin-bottom:.3rem;">Mode Simulasi Pengembang (Dev Mode)</b>
+              <p style="font-size:.8rem; color:var(--text-dim); margin:0 0 .6rem;">Proyek Appwrite Cloud belum dihubungkan di <code>data/appwrite-config.js</code>. Anda dapat menguji seluruh hak akses (RBAC) dengan tombol simulasi instan di bawah:</p>
+              <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
+                <button type="button" class="kas-btn kas-btn-sm" data-dev-login="admin"><span>Simulasi Admin (Arkoun)</span></button>
+                <button type="button" class="kas-btn kas-btn-sm" data-dev-login="pengurus"><span>Simulasi Bendahara (Rihana)</span></button>
+                <button type="button" class="kas-btn kas-btn-sm" data-dev-login="pj_matkul"><span>Simulasi PJ Matkul (Ghazi)</span></button>
+                <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" data-dev-login="mahasiswa"><span>Simulasi Mahasiswa (Davin)</span></button>
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="auth-error" id="login-error"></div>
+
+          <form id="form-login" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label for="login-identitas">NRP (Username) atau Email Mahasiswa</label>
+              <input class="auth-input" id="login-identitas" type="text" placeholder="contoh: 3326600016" autocomplete="username" required>
+            </div>
+            <div class="auth-field">
+              <label for="login-password">Kata Sandi</label>
+              <input class="auth-input" id="login-password" type="password" placeholder="Masukkan kata sandi akun" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="kas-btn kas-btn-primary" id="btn-submit-login" style="margin-top:.4rem;">
+              <span>Masuk ke Kelas SDT A</span>
+            </button>
+          </form>
+
+          <p style="margin:1.2rem 0 0; font-size:.76rem; color:var(--text-dim); line-height:1.4;">
+            <b>Catatan Akun:</b> Tidak ada registrasi mandiri. Akun dibuat dan dikelola oleh Admin kelas. Jika Anda lupa kata sandi, hubungi Admin atau Komandan Tingkat untuk reset kata sandi sementara.
+          </p>
+        </div>
+      `;
+
+      return {
+        sub: "Akses Pengguna Internal",
+        html,
+        after(body) {
+          const form = body.querySelector("#form-login");
+          const errBox = body.querySelector("#login-error");
+          const btnSubmit = body.querySelector("#btn-submit-login");
+
+          body.querySelectorAll("[data-dev-login]").forEach((b) => {
+            b.addEventListener("click", () => {
+              auth.devLogin(b.dataset.devLogin);
+              rerender("profil");
+            });
+          });
+
+          if (form) {
+            form.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              errBox.classList.remove("show");
+              errBox.textContent = "";
+
+              const identitas = body.querySelector("#login-identitas").value;
+              const password = body.querySelector("#login-password").value;
+
+              btnSubmit.disabled = true;
+              btnSubmit.querySelector("span").textContent = "Memverifikasi...";
+
+              try {
+                await auth.login(identitas, password);
+                rerender("profil");
+              } catch (err) {
+                errBox.textContent = err.message || "Gagal masuk. Periksa kembali kredensial Anda.";
+                errBox.classList.add("show");
+                btnSubmit.disabled = false;
+                btnSubmit.querySelector("span").textContent = "Masuk ke Kelas SDT A";
+              }
+            });
+          }
+        }
+      };
+    },
+
+    profil(arg, rerender) {
+      const auth = window.SDT && window.SDT.auth;
+      if (!auth || !auth.state || !auth.state.isLoggedIn) {
+        return this.masuk(arg, rerender);
+      }
+
+      const p = auth.state.profile || {};
+      const u = auth.state.user || {};
+      const role = auth.state.role || "mahasiswa";
+      const isSim = auth.state.isDevSim;
+
+      const roleBadge = role === "admin"
+        ? '<span class="tag red">ADMINISTRATOR</span>'
+        : role === "pengurus"
+        ? '<span class="tag now">PENGURUS KELAS</span>'
+        : '<span class="tag">MAHASISWA</span>';
+
+      const matkulInfo = p.matkul_pj && p.matkul_pj.length
+        ? `<p style="margin:.4rem 0 0; font-size:.76rem; color:var(--aqua);">Penanggung Jawab Matkul: <b>${esc(p.matkul_pj.join(", "))}</b></p>`
+        : '';
+
+      const html = `
+        <div class="profile-card">
+          <div class="profile-head">
+            <div class="profile-avatar">${initials(p.nama_lengkap || u.name || "M")}</div>
+            <div class="profile-info">
+              <h3>${esc(p.nama_lengkap || u.name || "Mahasiswa")}</h3>
+              <p>NIM: <b>${esc(p.nim || u.email || "-")}</b> &bull; ${roleBadge}</p>
+              ${p.jabatan ? `<p style="color:var(--foam); font-size:.78rem;">Jabatan: ${esc(p.jabatan)}</p>` : ''}
+              ${matkulInfo}
+              ${isSim ? '<span style="display:inline-block; font-size:.65rem; color:#ffb3ba; margin-top:.2rem;">[Mode Simulasi Dev Aktif]</span>' : ''}
+            </div>
+          </div>
+
+          <div style="display:flex; gap:.5rem; margin-top:.8rem; flex-wrap:wrap;">
+            <button type="button" class="kas-btn kas-btn-sm" id="btn-logout" style="border-color:rgba(255,32,51,.6); color:#ff8591;">
+              <span>Keluar dari Akun</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bagian 1: Perbarui Profil Pribadi -->
+        <div class="auth-card">
+          <h4 class="profile-section-title">Informasi Pribadi &amp; Profil</h4>
+          <p>Informasi ini ditampilkan pada direktori profil mahasiswa saat nama Anda diklik.</p>
+          <div class="auth-success" id="prof-success">Profil Anda berhasil diperbarui!</div>
+          <div class="auth-error" id="prof-error"></div>
+
+          <form id="form-edit-profil" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label for="prof-bio">Bio Singkat</label>
+              <textarea class="auth-textarea" id="prof-bio" placeholder="Tulis bio singkat tentang Anda...">${esc(p.bio || "")}</textarea>
+            </div>
+            <div class="auth-field">
+              <label for="prof-minat">Minat &amp; Bidang Favorit (Pisahkan dengan koma)</label>
+              <input class="auth-input" id="prof-minat" type="text" value="${esc((p.minat || []).join(", "))}" placeholder="contoh: Data Analytics, Python, NLP">
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.75rem;">
+              <div class="auth-field">
+                <label for="prof-github">GitHub URL</label>
+                <input class="auth-input" id="prof-github" type="url" value="${esc(p.github_url || "")}" placeholder="https://github.com/username">
+              </div>
+              <div class="auth-field">
+                <label for="prof-linkedin">LinkedIn URL</label>
+                <input class="auth-input" id="prof-linkedin" type="url" value="${esc(p.linkedin_url || "")}" placeholder="https://linkedin.com/in/username">
+              </div>
+              <div class="auth-field">
+                <label for="prof-ig">Instagram URL</label>
+                <input class="auth-input" id="prof-ig" type="url" value="${esc(p.instagram_url || "")}" placeholder="https://instagram.com/username">
+              </div>
+              <div class="auth-field">
+                <label for="prof-web">Website / Portofolio</label>
+                <input class="auth-input" id="prof-web" type="url" value="${esc(p.website_url || "")}" placeholder="https://web-pribadi.com">
+              </div>
+            </div>
+            <button type="submit" class="kas-btn kas-btn-primary" id="btn-save-profile" style="margin-top:.4rem; justify-self:start;">
+              <span>Simpan Perubahan Profil</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Bagian 2: Ganti Kata Sandi -->
+        <div class="auth-card">
+          <h4 class="profile-section-title">Ganti Kata Sandi</h4>
+          <p>Gunakan kombinasi kata sandi baru yang aman (minimal 8 karakter).</p>
+          <div class="auth-success" id="pw-success">Kata sandi berhasil diperbarui!</div>
+          <div class="auth-error" id="pw-error"></div>
+
+          <form id="form-change-password" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label for="pw-lama">Kata Sandi Lama</label>
+              <input class="auth-input" id="pw-lama" type="password" placeholder="Masukkan kata sandi lama Anda" required>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.75rem;">
+              <div class="auth-field">
+                <label for="pw-baru">Kata Sandi Baru</label>
+                <input class="auth-input" id="pw-baru" type="password" minlength="8" placeholder="Minimal 8 karakter" required>
+              </div>
+              <div class="auth-field">
+                <label for="pw-konfirm">Konfirmasi Kata Sandi Baru</label>
+                <input class="auth-input" id="pw-konfirm" type="password" minlength="8" placeholder="Ketik ulang kata sandi baru" required>
+              </div>
+            </div>
+            <button type="submit" class="kas-btn kas-btn-outline" id="btn-save-pw" style="margin-top:.4rem; justify-self:start;">
+              <span>Perbarui Kata Sandi</span>
+            </button>
+          </form>
+        </div>
+      `;
+
+      return {
+        sub: `Akun: ${esc(p.nama_lengkap || "Pengguna")} \u00b7 ${role.toUpperCase()}`,
+        html,
+        after(body) {
+          body.querySelector("#btn-logout")?.addEventListener("click", async () => {
+            if (confirm("Apakah Anda yakin ingin keluar dari akun?")) {
+              await auth.logout();
+              rerender("masuk");
+            }
+          });
+
+          const formProf = body.querySelector("#form-edit-profil");
+          const profSuccess = body.querySelector("#prof-success");
+          const profError = body.querySelector("#prof-error");
+          const btnProf = body.querySelector("#btn-save-profile");
+
+          if (formProf) {
+            formProf.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              profSuccess.classList.remove("show");
+              profError.classList.remove("show");
+
+              const bio = body.querySelector("#prof-bio").value.trim();
+              const minatStr = body.querySelector("#prof-minat").value.trim();
+              const minat = minatStr ? minatStr.split(",").map((s) => s.trim()).filter(Boolean) : [];
+              const github_url = body.querySelector("#prof-github").value.trim();
+              const linkedin_url = body.querySelector("#prof-linkedin").value.trim();
+              const instagram_url = body.querySelector("#prof-ig").value.trim();
+              const website_url = body.querySelector("#prof-web").value.trim();
+
+              btnProf.disabled = true;
+              btnProf.querySelector("span").textContent = "Menyimpan...";
+
+              try {
+                await auth.updateProfile({ bio, minat, github_url, linkedin_url, instagram_url, website_url });
+                profSuccess.classList.add("show");
+                btnProf.disabled = false;
+                btnProf.querySelector("span").textContent = "Simpan Perubahan Profil";
+              } catch (err) {
+                profError.textContent = err.message || "Gagal memperbarui profil.";
+                profError.classList.add("show");
+                btnProf.disabled = false;
+                btnProf.querySelector("span").textContent = "Simpan Perubahan Profil";
+              }
+            });
+          }
+
+          const formPw = body.querySelector("#form-change-password");
+          const pwSuccess = body.querySelector("#pw-success");
+          const pwError = body.querySelector("#pw-error");
+          const btnPw = body.querySelector("#btn-save-pw");
+
+          if (formPw) {
+            formPw.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              pwSuccess.classList.remove("show");
+              pwError.classList.remove("show");
+
+              const lama = body.querySelector("#pw-lama").value;
+              const baru = body.querySelector("#pw-baru").value;
+              const konfirm = body.querySelector("#pw-konfirm").value;
+
+              if (baru.length < 8) {
+                pwError.textContent = "Kata sandi baru minimal 8 karakter.";
+                pwError.classList.add("show");
+                return;
+              }
+              if (baru !== konfirm) {
+                pwError.textContent = "Konfirmasi kata sandi baru tidak cocok.";
+                pwError.classList.add("show");
+                return;
+              }
+
+              btnPw.disabled = true;
+              btnPw.querySelector("span").textContent = "Memperbarui...";
+
+              try {
+                await auth.changePassword(lama, baru);
+                pwSuccess.classList.add("show");
+                formPw.reset();
+                btnPw.disabled = false;
+                btnPw.querySelector("span").textContent = "Perbarui Kata Sandi";
+              } catch (err) {
+                pwError.textContent = err.message || "Gagal memperbarui kata sandi.";
+                pwError.classList.add("show");
+                btnPw.disabled = false;
+                btnPw.querySelector("span").textContent = "Perbarui Kata Sandi";
+              }
+            });
+          }
+        }
+      };
     }
   };
 }

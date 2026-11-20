@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1b38f0">
   <title>Sains Data Terapan A</title>
   <meta name="description" content="Situs kelas Sains Data Terapan A: jadwal kuliah, daftar anggota, pengurus, tugas, dan rangkuman materi.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src 'self' https://cloud.appwrite.io https://*.appwrite.io https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="id_ID">
@@ -30,9 +30,13 @@
   <script defer src="data/tugas.js"></script>
   <script defer src="data/tautan.js"></script>
   <script defer src="data/kas.js"></script>
+  <script defer src="data/appwrite-config.js"></script>
   <script defer src="data/musik.js"></script>
   <script defer src="data/rangkuman.js"></script>
   <script defer src="data/sunting.js"></script>
+  <script defer src="assets/js/vendor/appwrite.js"></script>
+  <script defer src="assets/js/appwrite-client.js"></script>
+  <script defer src="assets/js/auth.js"></script>
   <script defer src="assets/js/kas.js"></script>
   <script defer src="assets/js/panels.js"></script>
   <script defer src="assets/js/scene.js"></script>
@@ -182,6 +186,7 @@
   </section>
 
   <div class="top-actions">
+    <button class="motion auth-btn" id="auth-btn" type="button" aria-haspopup="dialog"><span>Masuk</span></button>
     <button class="motion" id="credits" type="button" aria-haspopup="dialog"><span>Kredit</span></button>
     <button class="motion" id="settings" type="button" aria-haspopup="dialog"><span>Pengaturan</span></button>
   </div>
