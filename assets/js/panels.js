@@ -105,21 +105,27 @@ function makePanels(data, now = new Date()) {
         }
         const status = state === "now" ? `<span class="tag now">Sedang berlangsung</span> ` : state === "next" ? `<span class="tag next">Berikutnya</span> ` : "";
 
-        // Reschedule override check
-        const ovr = overrides.find((o) => o.subject_id && (o.subject_id.toLowerCase().includes(s.matkul.toLowerCase()) || s.matkul.toLowerCase().includes(o.subject_id.toLowerCase())));
+        // Reschedule override check (hanya tampilkan selama tanggal pengganti/awal belum lewat)
+        const ovr = overrides.find((o) => {
+          const refDate = o.tanggal_pengganti || o.tanggal_awal;
+          if (refDate && selisihHari(refDate, now) < 0) return false;
+          return o.subject_id && (o.subject_id.toLowerCase().includes(s.matkul.toLowerCase()) || s.matkul.toLowerCase().includes(o.subject_id.toLowerCase()));
+        });
         let ovrBadge = "";
         let ovrNotice = "";
         if (ovr) {
           const tipe = ovr.tipe_perubahan || "pindah_jadwal";
+          const awalStr = ovr.tanggal_awal ? `${tanggal(ovr.tanggal_awal)} → ` : "";
+          const baruStr = ovr.tanggal_pengganti ? tanggal(ovr.tanggal_pengganti) : "";
           if (tipe === "pindah_jadwal") {
-            ovrBadge = `<span class="reschedule-badge">⚠️ RESCHEDULE: ${esc(ovr.tanggal_pengganti || '')} ${esc(ovr.mulai_pengganti || '')}-${esc(ovr.selesai_pengganti || '')}</span>`;
-            ovrNotice = `<div class="reschedule-notice"><b>Jadwal Pengganti:</b> Dipindah ke ${esc(ovr.ruang_pengganti || 'Lab')} (${esc(ovr.keterangan || 'Penyesuaian dosen')})</div>`;
+            ovrBadge = `<span class="reschedule-badge">⚠️ RESCHEDULE: ${esc(awalStr)}${esc(baruStr)} ${esc(ovr.mulai_pengganti || '')}-${esc(ovr.selesai_pengganti || '')}</span>`;
+            ovrNotice = `<div class="reschedule-notice"><b>Jadwal Pengganti:</b> ${ovr.tanggal_awal ? `Sesi ${esc(tanggal(ovr.tanggal_awal))} dipindah ke ${esc(baruStr)} ` : ''}di ${esc(ovr.ruang_pengganti || 'Lab')} (${esc(ovr.keterangan || 'Penyesuaian dosen')})</div>`;
           } else if (tipe === "online") {
-            ovrBadge = `<span class="reschedule-badge online">🌐 KULIAH DARING</span>`;
+            ovrBadge = `<span class="reschedule-badge online">🌐 KULIAH DARING (${esc(baruStr)})</span>`;
             ovrNotice = `<div class="reschedule-notice"><b>Kuliah Daring:</b> ${esc(ovr.ruang_pengganti || 'Tautan akan dibagikan')} (${esc(ovr.keterangan || '')})</div>`;
           } else if (tipe === "dibatalkan") {
             ovrBadge = `<span class="reschedule-badge batal">❌ PERKULIAHAN DIBATALKAN</span>`;
-            ovrNotice = `<div class="reschedule-notice"><b>Dibatalkan:</b> ${esc(ovr.keterangan || 'Tidak ada perkuliahan pada tanggal ini.')}</div>`;
+            ovrNotice = `<div class="reschedule-notice"><b>Dibatalkan${ovr.tanggal_awal ? ` (${esc(tanggal(ovr.tanggal_awal))})` : ''}:</b> ${esc(ovr.keterangan || 'Tidak ada perkuliahan pada tanggal ini.')}</div>`;
           }
         }
 
@@ -168,9 +174,15 @@ function makePanels(data, now = new Date()) {
                   <option value="dibatalkan">Perkuliahan Diliburkan / Dibatalkan</option>
                 </select>
               </div>
-              <div class="auth-field">
-                <label for="rs-tgl-pengganti">Tanggal Pengganti</label>
-                <input type="date" id="rs-tgl-pengganti" class="auth-input" value="${new Date().toISOString().slice(0, 10)}">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                <div class="auth-field">
+                  <label for="rs-tgl-awal">Tanggal Kuliah Awal</label>
+                  <input type="date" id="rs-tgl-awal" class="auth-input" value="${new Date().toISOString().slice(0, 10)}">
+                </div>
+                <div class="auth-field">
+                  <label for="rs-tgl-pengganti">Tanggal Pengganti</label>
+                  <input type="date" id="rs-tgl-pengganti" class="auth-input" value="${new Date().toISOString().slice(0, 10)}">
+                </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
                 <div class="auth-field">
@@ -249,12 +261,14 @@ function makePanels(data, now = new Date()) {
                 const created = await services.createScheduleOverride({
                   subject_id: body.querySelector("#rs-matkul").value,
                   tipe_perubahan: body.querySelector("#rs-tipe").value,
+                  tanggal_awal: body.querySelector("#rs-tgl-awal").value,
                   tanggal_pengganti: body.querySelector("#rs-tgl-pengganti").value,
                   mulai_pengganti: body.querySelector("#rs-jam-mulai").value,
                   selesai_pengganti: body.querySelector("#rs-jam-selesai").value,
                   ruang_pengganti: body.querySelector("#rs-ruang").value,
                   keterangan: body.querySelector("#rs-ket").value,
-                  status: 'aktif'
+                  status: 'aktif',
+                  created_by: (auth && auth.state && auth.state.user && auth.state.user.$id) || 'pengurus'
                 });
                 window.SDT.services_cache = window.SDT.services_cache || {};
                 window.SDT.services_cache.overrides = window.SDT.services_cache.overrides || [];
@@ -269,6 +283,35 @@ function makePanels(data, now = new Date()) {
                 saveBtn.disabled = false;
               }
             });
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
           }
         }
       };
@@ -343,11 +386,11 @@ function makePanels(data, now = new Date()) {
             $id: `usr-${computedNim}`,
             nim: computedNim,
             nama_lengkap: nama,
-            role: (nama.includes("Arkoun") || nama.includes("Azzam")) ? "admin" : "mahasiswa",
-            jabatan: nama.includes("Arkoun") ? "Admin & Web Master" : nama.includes("Azzam") ? "Komandan Tingkat" : "Mahasiswa",
+            role: (nama.includes("Arkoun") || nama.includes("Hilmi")) ? "admin" : nama.includes("Azzam") ? "pengurus" : "mahasiswa",
+            jabatan: nama.includes("Azzam") ? "Komandan Tingkat" : "Mahasiswa",
             bio: "Mahasiswa Sains Data Terapan A PENS.",
             minat: ["Data Science", "Machine Learning"],
-            matkul_pj: [],
+            matkul_pj: nama.includes("Hilmi") ? ["Agama"] : [],
             github_url: "",
             linkedin_url: "",
             instagram_url: "",
@@ -524,9 +567,14 @@ function makePanels(data, now = new Date()) {
                     updatePayload.jabatan = b.querySelector("#ep-jabatan").value.trim();
                   }
 
-                  await services.updateProfile(profile.$id, updatePayload);
                   if (isOwner && auth && auth.updateProfile) {
-                    await auth.updateProfile(updatePayload);
+                    const updated = await auth.updateProfile(updatePayload);
+                    if (window.SDT.services_cache && window.SDT.services_cache.profiles) {
+                      const idx = window.SDT.services_cache.profiles.findIndex((x) => x.$id === profile.$id);
+                      if (idx >= 0 && updated) window.SDT.services_cache.profiles[idx] = updated;
+                    }
+                  } else {
+                    await services.updateProfile(profile.$id, updatePayload);
                   }
 
                   succEl.textContent = "Profil berhasil disimpan!";
@@ -601,15 +649,60 @@ function makePanels(data, now = new Date()) {
       };
     },
 
-    pengurus() {
+    pengurus(period = "2026/2027", rerender) {
       if (data.anggota.error) return gagal(data.anggota.error);
       const { dosenWali, pengurus, pengembang } = data.anggota.data;
+      const services = window.SDT && window.SDT.services;
+      const liveProfiles = (window.SDT.services_cache && window.SDT.services_cache.profiles) || [];
+      const TUGAS_POKOK = {
+        "Komandan Tingkat": "Koordinasi kelas, komunikasi dosen & jurusan, serta penanggung jawab umum.",
+        "Wakil Komandan Tingkat": "Mendampingi Komti serta mengoordinasikan agenda harian kelas.",
+        "Sekretaris": "Administrasi presensi, notulensi, arsip surat, dan dokumentasi kegiatan.",
+        "Bendahara": "Pengelolaan uang kas bulanan, buku mutasi, dan laporan keuangan kelas."
+      };
+
+      const isArsip = period === "2025/2026";
+      // Gabungkan data pengurus statis dengan pembaruan role/jabatan live dari Appwrite profiles (untuk periode aktif)
+      const activeList = (!isArsip && liveProfiles.length)
+        ? liveProfiles
+            .filter((m) => m.role === "pengurus" || (m.jabatan && m.jabatan !== "Mahasiswa" && !m.jabatan.includes("Web Master")))
+            .map((m) => ({
+              jabatan: m.jabatan || "Pengurus",
+              nama: m.nama_lengkap,
+              nim: m.nim,
+              matkul_pj: m.matkul_pj || []
+            }))
+        : pengurus.map((p) => ({ jabatan: p.jabatan, nama: p.nama, nim: null, matkul_pj: [] }));
+
+      const sourceList = activeList.length ? activeList : pengurus;
       const grup = [];
-      pengurus.forEach((p) => {
+      sourceList.forEach((p) => {
         const g = grup.find((x) => x.jabatan === p.jabatan);
-        g ? g.nama.push(p.nama) : grup.push({ jabatan: p.jabatan, nama: [p.nama] });
+        const item = { nama: p.nama, nim: p.nim };
+        g ? g.members.push(item) : grup.push({ jabatan: p.jabatan, members: [item] });
       });
-      const cards = grup.map((p, i) => `<div class="officer" style="--i:${i + 1}"><div class="num" aria-hidden="true">${ROMAWI[i] || i + 1}</div><p class="role">${esc(p.jabatan)}</p><p translate="no">${p.nama.map(esc).join("<br>")}</p></div>`).join("");
+
+      const cards = isArsip
+        ? `<div class="empty" style="grid-column:1/-1;"><b>Arsip Kepengurusan 2025/2026</b><p>Periode perdana pembentukan kelas 1 SDT A dimulai pada semester ganjil 2026/2027.</p></div>`
+        : grup.map((p, i) => `
+            <div class="officer" style="--i:${i + 1}">
+              <div class="num" aria-hidden="true">${ROMAWI[i] || i + 1}</div>
+              <p class="role">${esc(p.jabatan)}</p>
+              <p translate="no">${p.members.map((m) => m.nim
+                ? `<a href="#anggota/${esc(m.nim)}" style="color:inherit;text-decoration:underline dotted;">${esc(m.nama)}</a>`
+                : esc(m.nama)).join("<br>")}</p>
+              ${TUGAS_POKOK[p.jabatan] ? `<small style="display:block;margin-top:.45rem;font-size:.72rem;color:var(--text-dim);line-height:1.35;">${esc(TUGAS_POKOK[p.jabatan])}</small>` : ""}
+            </div>
+          `).join("");
+
+      // Daftar PJ Mata Kuliah dari jadwal & profil live
+      const jadwalData = (data.jadwal && data.jadwal.data) || {};
+      const pjRows = [];
+      KULIAH.forEach((hari) => {
+        (jadwalData[hari] || []).forEach((s) => {
+          if (s.matkul && s.pj) pjRows.push({ matkul: s.matkul, pj: s.pj, hari });
+        });
+      });
 
       const devList = pengembang || [
         { peran: "Frontend & Core Feature", nama: ["Mohammad Aditya Arkoun"], ket: "Arsitektur antarmuka, tata letak interaktif, sistem menu, dan fitur inti website." },
@@ -623,8 +716,70 @@ function makePanels(data, now = new Date()) {
       }).join("");
 
       return {
-        sub: "Struktur organisasi kelas",
-        html: `<div class="officer wali" style="--i:0"><div class="num" aria-hidden="true">0</div><p class="role">${esc(dosenWali.jabatan)}</p><p translate="no">${esc(dosenWali.nama)}</p></div><div class="officers">${cards}</div><div class="dev-team-section"><div class="dev-team-head"><h3 class="dev-team-title">Tim Pengembang Website</h3><p class="dev-team-sub">Mahasiswa yang membangun &amp; merancang situs ini</p></div><div class="dev-cards">${devCards}</div></div>`
+        sub: `Struktur organisasi kelas · Periode ${esc(period)}`,
+        html: `
+          <div class="task-header-row" style="margin-bottom:1rem;">
+            <div class="task-tabs" role="tablist" aria-label="Periode kepengurusan">
+              <button type="button" class="task-tab" data-period="2026/2027" aria-selected="${!isArsip}"><span>2026/2027 (Aktif)</span></button>
+              <button type="button" class="task-tab" data-period="2025/2026" aria-selected="${isArsip}"><span>2025/2026 (Arsip)</span></button>
+            </div>
+          </div>
+          <div class="officer wali" style="--i:0"><div class="num" aria-hidden="true">0</div><p class="role">${esc(dosenWali.jabatan)}</p><p translate="no">${esc(dosenWali.nama)}</p></div>
+          <div class="officers">${cards}</div>
+          ${(!isArsip && pjRows.length) ? `
+            <div class="dev-team-section">
+              <div class="dev-team-head">
+                <h3 class="dev-team-title">Penanggung Jawab Mata Kuliah</h3>
+                <p class="dev-team-sub">Koordinator jadwal &amp; komunikasi dosen per mata kuliah</p>
+              </div>
+              <ul class="list">${pjRows.map((x, idx) => `<li style="--i:${idx}"><span class="time">${esc(x.hari)}</span><div><h3>${esc(x.matkul)}</h3><p>PJ: <b translate="no">${esc(x.pj)}</b></p></div></li>`).join("")}</ul>
+            </div>
+          ` : ""}
+          <div class="dev-team-section"><div class="dev-team-head"><h3 class="dev-team-title">Tim Pengembang Website</h3><p class="dev-team-sub">Mahasiswa yang membangun &amp; merancang situs ini</p></div><div class="dev-cards">${devCards}</div></div>
+        `,
+        after(body) {
+          body.querySelectorAll("[data-period]").forEach((btn) => {
+            btn.addEventListener("click", () => rerender(btn.dataset.period));
+          });
+          if (services && services.listProfiles && !liveProfiles.length) {
+            services.listProfiles().then((list) => {
+              if (list && list.length) {
+                window.SDT.services_cache = window.SDT.services_cache || {};
+                window.SDT.services_cache.profiles = list;
+                rerender(period);
+              }
+            }).catch(() => {});
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
+          }
+        }
       };
     },
 
@@ -838,6 +993,35 @@ function makePanels(data, now = new Date()) {
             });
           } else {
             renderItems([]);
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
           }
         }
       };
@@ -981,6 +1165,35 @@ function makePanels(data, now = new Date()) {
             services.listLinks().then(renderItems).catch(() => renderItems([]));
           } else {
             renderItems([]);
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
           }
         }
       };
@@ -1106,6 +1319,35 @@ function makePanels(data, now = new Date()) {
                 btnSubmit.querySelector("span").textContent = "Masuk ke Kelas SDT A";
               }
             });
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
           }
         }
       };
@@ -1132,10 +1374,13 @@ function makePanels(data, now = new Date()) {
         ? `<p style="margin:.4rem 0 0; font-size:.76rem; color:var(--aqua);">Penanggung Jawab Matkul: <b>${esc(p.matkul_pj.join(", "))}</b></p>`
         : '';
 
+      const services = window.SDT && window.SDT.services;
+      const avatarUrl = (services && services.getAvatarViewUrl) ? services.getAvatarViewUrl(p.foto_id) : null;
+
       const html = `
         <div class="profile-card">
           <div class="profile-head">
-            <div class="profile-avatar">${initials(p.nama_lengkap || u.name || "M")}</div>
+            <div class="profile-avatar">${avatarUrl ? `<img src="${esc(avatarUrl)}" alt="${esc(p.nama_lengkap || u.name || 'Mahasiswa')}">` : initials(p.nama_lengkap || u.name || "M")}</div>
             <div class="profile-info">
               <h3>${esc(p.nama_lengkap || u.name || "Mahasiswa")}</h3>
               <p>NIM: <b>${esc(p.nim || u.email || "-")}</b> &bull; ${roleBadge}</p>
@@ -1160,6 +1405,10 @@ function makePanels(data, now = new Date()) {
           <div class="auth-error" id="prof-error"></div>
 
           <form id="form-edit-profil" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label for="prof-avatar">Foto Profil Baru (Maks 2MB, JPG/PNG/WebP)</label>
+              <input class="auth-input" id="prof-avatar" type="file" accept="image/jpeg,image/png,image/webp" style="padding:.4rem;">
+            </div>
             <div class="auth-field">
               <label for="prof-bio">Bio Singkat</label>
               <textarea class="auth-textarea" id="prof-bio" placeholder="Tulis bio singkat tentang Anda...">${esc(p.bio || "")}</textarea>
@@ -1252,9 +1501,15 @@ function makePanels(data, now = new Date()) {
                 <label for="adm-matkul-pj">Matkul PJ (Pisahkan dengan koma, atau "all")</label>
                 <input class="auth-input" id="adm-matkul-pj" type="text" placeholder="contoh: Matematika 1, Statistika Dasar">
               </div>
-              <button type="submit" class="kas-btn kas-btn-primary" id="btn-save-adm" style="margin-top:.4rem; justify-self:start;">
-                <span>Simpan Role &amp; Penugasan</span>
-              </button>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem;">
+                <button type="submit" class="kas-btn kas-btn-primary" id="btn-save-adm">
+                  <span>Simpan Role &amp; Penugasan</span>
+                </button>
+                <button type="button" class="kas-btn kas-btn-outline" id="btn-reset-pw-adm" style="border-color:rgba(255,32,51,.6);color:#ff8591;">
+                  <span>🔑 Reset Password Sementara</span>
+                </button>
+              </div>
+              <div class="auth-success" id="adm-reset-result" style="margin-top:.5rem;"></div>
             </form>
           </div>
         ` : ""}
@@ -1294,10 +1549,19 @@ function makePanels(data, now = new Date()) {
               btnProf.querySelector("span").textContent = "Menyimpan...";
 
               try {
-                await auth.updateProfile({ bio, minat, github_url, linkedin_url, instagram_url, website_url });
+                let fotoId = p.foto_id;
+                const avatarInput = body.querySelector("#prof-avatar");
+                if (avatarInput && avatarInput.files && avatarInput.files[0] && services && services.uploadAvatar) {
+                  const uploaded = await services.uploadAvatar(avatarInput.files[0]);
+                  fotoId = uploaded.$id;
+                }
+                const payload = { bio, minat, github_url, linkedin_url, instagram_url, website_url };
+                if (fotoId !== undefined) payload.foto_id = fotoId;
+                await auth.updateProfile(payload);
                 profSuccess.classList.add("show");
                 btnProf.disabled = false;
                 btnProf.querySelector("span").textContent = "Simpan Perubahan Profil";
+                if (avatarInput && avatarInput.files && avatarInput.files[0]) rerender("profil");
               } catch (err) {
                 profError.textContent = err.message || "Gagal memperbarui profil.";
                 profError.classList.add("show");
@@ -1411,6 +1675,35 @@ function makePanels(data, now = new Date()) {
                 btnAdm.querySelector("span").textContent = "Simpan Role & Penugasan";
               }
             });
+            const btnResetAdm = body.querySelector("#btn-reset-pw-adm");
+            const admResetRes = body.querySelector("#adm-reset-result");
+            if (btnResetAdm && admResetRes) {
+              btnResetAdm.addEventListener("click", async () => {
+                const docId = selMember.value;
+                const target = memberProfiles.find((m) => m.$id === docId);
+                if (!docId || !target) return;
+                if (!confirm(`Reset kata sandi untuk ${target.nama_lengkap} (${target.nim})?`)) return;
+                admResetRes.classList.remove("show");
+                admErr.classList.remove("show");
+                btnResetAdm.disabled = true;
+                try {
+                  const res = await services.adminResetPassword(docId);
+                  admResetRes.innerHTML = `Kata sandi sementara baru untuk <b>${esc(target.nama_lengkap)}</b>: <code style="user-select:all;">${esc(res.temporaryPassword)}</code>`;
+                  admResetRes.classList.add("show");
+                  services.logActivity("akun", "reset_password", `Admin mereset password ${target.nim}`);
+                } catch (err) {
+                  if (err.message === "FUNCTION_NOT_CONFIGURED") {
+                    admResetRes.innerHTML = `Function cloud belum disetel. Jalankan perintah berikut di terminal admin:<br><code style="user-select:all;">node scripts/reset-password.js ${esc(target.nim)}</code>`;
+                    admResetRes.classList.add("show");
+                  } else {
+                    admErr.textContent = err.message || "Gagal mereset kata sandi.";
+                    admErr.classList.add("show");
+                  }
+                } finally {
+                  btnResetAdm.disabled = false;
+                }
+              });
+            }
           }
         }
       };

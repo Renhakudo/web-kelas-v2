@@ -178,7 +178,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { closePanel(); return; }
   if (open) {
     if (e.key === "Tab") { // jaga fokus tetap di dalam panel
-      const f = [...panel.querySelectorAll("button:not([tabindex='-1']), input, summary, a[href]")];
+      const f = [...panel.querySelectorAll("button:not([tabindex='-1']), input, select, textarea, summary, a[href]")];
       const first = f[0], last = f[f.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -284,6 +284,37 @@ panels.pengaturan = panelPengaturan;
 const gambarRingkas = () => { $("#today").innerHTML = ringkas(semua, semua.semester).map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join(""); };
 gambarRingkas();
 setInterval(gambarRingkas, 60000);
+
+// Preload data dinamis dari Appwrite Cloud agar Ringkasan Beranda, Kalender, dan Jadwal Pengganti langsung akurat
+if (window.SDT && window.SDT.services) {
+  const svc = window.SDT.services;
+  window.SDT.services_cache = window.SDT.services_cache || {};
+  Promise.all([
+    svc.listAssignments().catch(() => []),
+    svc.listScheduleOverrides().catch(() => []),
+    svc.listProfiles().catch(() => [])
+  ]).then(([assignments, overrides, profiles]) => {
+    if (Array.isArray(assignments) && assignments.length) {
+      window.SDT.services_cache.assignments = assignments;
+      semua.tugas.data = assignments.map((t) => ({
+        jenis: "tugas",
+        judul: t.judul,
+        matkul: t.subject_id || "",
+        isi: t.deskripsi || "",
+        tenggat: t.deadline || "",
+        tautan: t.link_pengumpulan || "",
+        status: t.status || "aktif"
+      }));
+      gambarRingkas();
+    }
+    if (Array.isArray(overrides)) {
+      window.SDT.services_cache.overrides = overrides;
+    }
+    if (Array.isArray(profiles) && profiles.length) {
+      window.SDT.services_cache.profiles = profiles;
+    }
+  }).catch(() => {});
+}
 if (pendingKey && document.body.classList.contains("open")) show(pendingKey, pendingArg);
 pendingKey = null;
 })();

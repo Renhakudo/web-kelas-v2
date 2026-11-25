@@ -101,35 +101,45 @@ async function main() {
       }
     }
 
-    // Definisi 12 Koleksi
+    // Definisi 13 Koleksi beserta Permission berbasis RBAC Appwrite Labels (admin, pengurus)
     const collections = [
-      { id: 'profiles', name: 'Profil Mahasiswa' },
-      { id: 'subjects', name: 'Mata Kuliah' },
-      { id: 'default_schedules', name: 'Jadwal Reguler' },
-      { id: 'schedule_overrides', name: 'Jadwal Pengganti' },
-      { id: 'assignments', name: 'Tugas Kuliah' },
-      { id: 'cash_settings', name: 'Pengaturan Kas' },
-      { id: 'cash_month_settings', name: 'Aturan Skip Bulan Kas' },
-      { id: 'cash_payments', name: 'Iuran Mahasiswa' },
-      { id: 'cash_transactions', name: 'Mutasi Transaksi Kas' },
-      { id: 'summaries', name: 'Rangkuman Materi' },
-      { id: 'summary_revisions', name: 'Riwayat Revisi Rangkuman' },
-      { id: 'links', name: 'Tautan Kelas' },
-      { id: 'activity_logs', name: 'Log Aktivitas Sistem' }
+      { id: 'profiles', name: 'Profil Mahasiswa', perms: ['read("any")', 'create("label:admin")', 'update("label:admin")', 'delete("label:admin")'] },
+      { id: 'subjects', name: 'Mata Kuliah', perms: ['read("any")', 'create("label:admin")', 'update("label:admin")', 'delete("label:admin")'] },
+      { id: 'default_schedules', name: 'Jadwal Reguler', perms: ['read("any")', 'create("label:admin")', 'update("label:admin")', 'delete("label:admin")'] },
+      { id: 'schedule_overrides', name: 'Jadwal Pengganti', perms: ['read("any")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")', 'delete("label:pengurus")'] },
+      { id: 'assignments', name: 'Tugas Kuliah', perms: ['read("any")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")', 'delete("label:pengurus")'] },
+      { id: 'cash_settings', name: 'Pengaturan Kas', perms: ['read("users")', 'create("label:admin")', 'update("label:admin")'] },
+      { id: 'cash_month_settings', name: 'Aturan Skip Bulan Kas', perms: ['read("users")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")', 'delete("label:pengurus")'] },
+      { id: 'cash_payments', name: 'Iuran Mahasiswa', perms: ['read("users")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")'] },
+      { id: 'cash_transactions', name: 'Mutasi Transaksi Kas', perms: ['read("users")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")', 'delete("label:pengurus")'] },
+      { id: 'summaries', name: 'Rangkuman Materi', perms: ['read("any")', 'create("users")', 'update("users")', 'delete("label:admin")'] },
+      { id: 'summary_revisions', name: 'Riwayat Revisi Rangkuman', perms: ['read("users")', 'create("users")'] },
+      { id: 'links', name: 'Tautan Kelas', perms: ['read("any")', 'create("label:admin")', 'create("label:pengurus")', 'update("label:admin")', 'update("label:pengurus")', 'delete("label:admin")', 'delete("label:pengurus")'] },
+      { id: 'activity_logs', name: 'Log Aktivitas Sistem', perms: ['read("label:admin")', 'create("users")'] }
     ];
 
-    console.log(`\n[2/4] Membuat ${collections.length} Koleksi...`);
+    console.log(`\n[2/4] Membuat & Menyelaraskan ${collections.length} Koleksi...`);
     for (const c of collections) {
       process.stdout.write(`  - Koleksi: ${c.id.padEnd(22)}`);
       const colRes = await request(endpoint, apiKey, projectId, `/databases/${databaseId}/collections`, 'POST', {
         collectionId: c.id,
         name: c.name,
-        permissions: ['read("any")', 'create("users")', 'update("users")', 'delete("users")'],
+        permissions: c.perms,
         documentSecurity: true,
         enabled: true
       });
       if (colRes.status === 409) {
-        console.log('[Sudah Ada]');
+        try {
+          await request(endpoint, apiKey, projectId, `/databases/${databaseId}/collections/${c.id}`, 'PUT', {
+            name: c.name,
+            permissions: c.perms,
+            documentSecurity: true,
+            enabled: true
+          });
+          console.log('[Diselaraskan]');
+        } catch {
+          console.log('[Sudah Ada]');
+        }
       } else {
         console.log('[Sukses]');
       }

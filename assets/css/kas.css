@@ -742,8 +742,20 @@
   opacity: 1;
 }
 
+.kas-skip-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: .5rem;
+  align-items: end;
+  margin-bottom: .85rem;
+}
+
 /* Responsif Layar Kecil */
 @media (max-width: 760px) {
+  .kas-skip-grid {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
   .kas-tabs {
     grid-template-columns: repeat(2, 1fr);
   }

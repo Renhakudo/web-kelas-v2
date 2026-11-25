@@ -333,7 +333,7 @@
             <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-tutup-skip"><span>Tutup</span></button>
           </div>
           <p style="font:500 .8rem var(--sans);color:var(--text-dim);margin:0 0 1rem;">Bulan yang dilewati (misal libur semester) tidak menambah tagihan atau dianggap menunggak.</p>
-          <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:.5rem;align-items:end;margin-bottom:.85rem;">
+          <div class="kas-skip-grid">
             <div class="kas-field">
               <label for="sk-periode">Periode (YYYY-MM)</label>
               <input type="text" id="sk-periode" class="kas-input" placeholder="contoh: 2026-12">

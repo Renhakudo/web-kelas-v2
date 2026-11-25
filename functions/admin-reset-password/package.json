@@ -1,0 +1,6 @@
+{
+  "name": "admin-reset-password",
+  "version": "1.0.0",
+  "description": "Appwrite Function aman untuk reset password akun mahasiswa SDT A oleh Admin",
+  "main": "src/main.js"
+}

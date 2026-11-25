@@ -34,5 +34,10 @@ window.DATA.appwrite = {
     "default": "sdta_storage",
     "avatars": "sdta_storage",
     "attachments": "sdta_storage"
+  },
+
+  // ID Appwrite Functions (opsional, untuk reset password dari dashboard Admin)
+  "functions": {
+    "adminResetPassword": ""
   }
 };

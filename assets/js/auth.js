@@ -240,7 +240,13 @@
     if (state.role === "admin") return true;
     if (state.role !== "pengurus") return false;
     const list = (state.profile && state.profile.matkul_pj) || [];
-    return list.includes("all") || list.includes(subjectCodeOrId);
+    const target = String(subjectCodeOrId || "").trim().toLowerCase();
+    return list.some((entry) => {
+      const item = String(entry || "").trim().toLowerCase();
+      if (!item) return false;
+      if (item === "all" || item === target) return true;
+      return target && (item.length >= 3 && target.includes(item) || item.includes(target));
+    });
   }
 
   function canManageCash() {

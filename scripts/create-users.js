@@ -91,10 +91,10 @@ async function main() {
   console.log(`\nMemproses ${mahasiswaList.length} mahasiswa dari data/anggota.js...\n`);
 
   // Identifikasi role
-  // Admin: Mohammad Aditya Arkoun (Frontend/Core dev) & Abdullah Azzam Hibatullah (Komti)
+  // Admin: Mohammad Aditya Arkoun & Muhammad Hilmi Mu'Afa
   const ADMIN_NAMES = [
     'Mohammad Aditya Arkoun',
-    'Abdullah Azzam Hibatullah'
+    "Muhammad Hilmi Mu'Afa"
   ];
 
   const credentials = [];
@@ -106,17 +106,18 @@ async function main() {
     const email = `${nrp}@student.pens.ac.id`;
     const password = generatePassword();
 
-    // Tentukan role & jabatan
+    // Tentukan role & jabatan (struktur kelas dari data/anggota.js)
     let role = 'mahasiswa';
     let jabatan = 'Mahasiswa';
     const pengurusMatch = pengurusList.find((p) => p.nama === nama);
 
-    if (ADMIN_NAMES.includes(nama)) {
-      role = 'admin';
-      jabatan = nama.includes('Arkoun') ? 'Admin & Web Master' : 'Komandan Tingkat';
-    } else if (pengurusMatch) {
+    if (pengurusMatch) {
       role = 'pengurus';
       jabatan = pengurusMatch.jabatan;
+    }
+    if (ADMIN_NAMES.includes(nama)) {
+      role = 'admin';
+      // Jabatan struktur kelas tetap sesuai peran di kelas (tidak menimpa menjadi Komandan Tingkat)
     }
 
     process.stdout.write(`[${i + 1}/${mahasiswaList.length}] NRP ${nrp} - ${nama.padEnd(35)} (${role.toUpperCase()})... `);
@@ -141,7 +142,15 @@ async function main() {
         userId = userRes.data.$id || userId;
       }
 
-      // 2. Buat dokumen profil di koleksi 'profiles' (jika sudah ada, lakukan update)
+      // 1b. Tetapkan label role Appwrite Auth ('admin' | 'pengurus' | 'mahasiswa') untuk RBAC backend
+      try {
+        await request(endpoint, apiKey, projectId, `/users/${userId}/labels`, 'PUT', {
+          labels: [role]
+        });
+      } catch (e) {}
+
+      // 2. Buat dokumen profil di koleksi 'profiles' (jika sudah ada, lakukan update + perketat permission)
+      const matkulPj = nama.includes('Hilmi') ? ['Agama'] : [];
       const profData = {
         nim: nrp,
         nama_lengkap: nama,
@@ -149,24 +158,27 @@ async function main() {
         jabatan,
         bio: `${jabatan} - Kelas Sains Data Terapan A PENS.`,
         minat: ['Data Science', 'Machine Learning'],
-        matkul_pj: role === 'admin' ? ['all'] : []
+        matkul_pj: matkulPj
       };
+
+      const profPerms = [
+        'read("any")',
+        `update("user:${userId}")`,
+        'update("label:admin")',
+        'delete("label:admin")'
+      ];
 
       try {
         const docRes = await request(endpoint, apiKey, projectId, `/databases/${databaseId}/collections/profiles/documents`, 'POST', {
           documentId: userId,
           data: profData,
-          permissions: [
-            'read("any")',
-            `update("user:${userId}")`,
-            'update("users")',
-            'delete("users")'
-          ]
+          permissions: profPerms
         });
 
         if (docRes.status === 409) {
           await request(endpoint, apiKey, projectId, `/databases/${databaseId}/collections/profiles/documents/${userId}`, 'PATCH', {
-            data: profData
+            data: profData,
+            permissions: profPerms
           });
         }
       } catch (docErr) {

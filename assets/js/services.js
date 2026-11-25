@@ -15,7 +15,7 @@
   function getLocalFallbackProfiles() {
     const rawList = (window.DATA && window.DATA.anggota && window.DATA.anggota.mahasiswa) || [];
     const pengurus = (window.DATA && window.DATA.anggota && window.DATA.anggota.pengurus) || [];
-    const ADMIN_NAMES = ['Mohammad Aditya Arkoun', 'Abdullah Azzam Hibatullah'];
+    const ADMIN_NAMES = ['Mohammad Aditya Arkoun', "Muhammad Hilmi Mu'Afa"];
 
     return rawList.map((nama, idx) => {
       const nim = String(BASE_NIM + idx);
@@ -23,12 +23,12 @@
       let role = 'mahasiswa';
       let jabatan = 'Mahasiswa';
 
-      if (ADMIN_NAMES.includes(nama)) {
-        role = 'admin';
-        jabatan = nama.includes('Arkoun') ? 'Admin & Web Master' : 'Komandan Tingkat';
-      } else if (pengurusMatch) {
+      if (pengurusMatch) {
         role = 'pengurus';
         jabatan = pengurusMatch.jabatan;
+      }
+      if (ADMIN_NAMES.includes(nama)) {
+        role = 'admin';
       }
 
       return {
@@ -39,7 +39,7 @@
         jabatan,
         bio: `${jabatan} - Kelas Sains Data Terapan A PENS.`,
         minat: ['Data Science', 'Machine Learning'],
-        matkul_pj: role === 'admin' ? ['all'] : [],
+        matkul_pj: nama.includes('Hilmi') ? ['Agama'] : [],
         github_url: '',
         linkedin_url: '',
         instagram_url: '',
@@ -699,6 +699,28 @@
     }
   }
 
+  async function adminResetPassword(targetUserId) {
+    const funcId = config.functions && config.functions.adminResetPassword;
+    if (!isConfigured || !appwrite.functions || !funcId) {
+      throw new Error('FUNCTION_NOT_CONFIGURED');
+    }
+    try {
+      const exec = await appwrite.functions.createExecution(
+        funcId,
+        JSON.stringify({ targetUserId }),
+        false
+      );
+      let body = {};
+      try { body = JSON.parse(exec.responseBody || '{}'); } catch {}
+      if (exec.status === 'failed' || body.ok === false) {
+        throw new Error(body.message || 'Eksekusi Function reset password gagal.');
+      }
+      return body;
+    } catch (err) {
+      throw new Error(appwrite.terjemahkanError(err));
+    }
+  }
+
   // ==========================================
   // EXPORT KE GLOBAL NAMESPACE
   // ==========================================
@@ -710,6 +732,7 @@
     updateProfile,
     uploadAvatar,
     getAvatarViewUrl,
+    adminResetPassword,
     // Reschedule
     listScheduleOverrides,
     createScheduleOverride,

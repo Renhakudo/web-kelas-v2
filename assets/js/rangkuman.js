@@ -728,8 +728,8 @@ function showLogin() {
   const box = $("#np-body .np-content");
   box.innerHTML = `<form class="ed-login" novalidate>
     <h2>Masuk untuk menyunting</h2>
-    <p>Hanya akun penyunting yang didaftarkan pengurus kelas yang bisa mengubah rangkuman.</p>
-    <label for="ed-email">Email</label><input id="ed-email" type="email" autocomplete="username" spellcheck="false" required>
+    <p>Gunakan akun NRP atau Email kelas SDT A Anda untuk menambahkan atau menyunting rangkuman.</p>
+    <label for="ed-email">NRP atau Email</label><input id="ed-email" type="text" placeholder="contoh: 3326600016" autocomplete="username" spellcheck="false" required>
     <label for="ed-sandi">Kata sandi</label><input id="ed-sandi" type="password" autocomplete="current-password" required>
     <p class="ed-err" id="ed-err" role="alert"></p>
     <div class="ed-actions"><button class="ed-primary" type="submit">Masuk</button><button class="ed-ghost" type="button" id="ed-batal">Batal</button></div>
@@ -739,7 +739,7 @@ function showLogin() {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = $("#ed-email", box).value.trim(), sandi = $("#ed-sandi", box).value;
-    if (!email || !sandi) { err.textContent = "Isi email dan kata sandi."; return; }
+    if (!email || !sandi) { err.textContent = "Isi NRP/email dan kata sandi."; return; }
     const btn = form.querySelector("[type=submit]");
     btn.disabled = true; err.textContent = "";
     try { await cloud.masuk(email, sandi); showEditor(); }
@@ -755,7 +755,7 @@ function showEditor() {
   const n = week, k = course.minggu[n];
   edit = { n, versi: (k && k.versi) || null, dirty: false };
   const draft = getDraft();
-  const v = draft || { judul: k ? k.judul : "", penulis: k && k.status !== "contoh" ? k.penulis || "" : "", isi: k ? String(k.isi || "").trim() : "" };
+  const v = draft || { judul: k ? k.judul : "", penulis: (k && k.status !== "contoh" && k.penulis) ? k.penulis : (cloud.pengguna() || ""), isi: k ? String(k.isi || "").trim() : "" };
   bar(draft ? "Draf yang belum tersimpan dipulihkan." : "");
   if (draft) edit.dirty = true;
   editBtn.hidden = true;

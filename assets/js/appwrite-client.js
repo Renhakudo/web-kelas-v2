@@ -8,6 +8,7 @@
   let account = null;
   let databases = null;
   let storage = null;
+  let functions = null;
 
   if (isConfigured && window.Appwrite) {
     try {
@@ -18,6 +19,7 @@
       account = new window.Appwrite.Account(client);
       databases = new window.Appwrite.Databases(client);
       storage = new window.Appwrite.Storage(client);
+      functions = new window.Appwrite.Functions(client);
     } catch (err) {
       console.warn("Gagal inisialisasi Appwrite Client:", err);
     }
@@ -53,6 +55,7 @@
     account,
     databases,
     storage,
+    functions,
     terjemahkanError
   };
 })();
