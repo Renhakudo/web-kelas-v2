@@ -254,11 +254,66 @@ body.open .top-actions { opacity: .25; pointer-events: none; }
 .auth-success.show { display: block; }
 .profile-card { background: var(--card); border: 2px solid var(--edge); padding: 1.3rem; margin-bottom: 1.25rem; }
 .profile-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-.profile-avatar { width: 3.8rem; height: 3.8rem; background: var(--foam); color: var(--ink); font: italic 900 1.5rem/1 var(--display); display: grid; place-items: center; clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%); flex: none; }
+.profile-avatar { width: 3.8rem; height: 3.8rem; background: var(--foam); color: var(--ink); font: italic 900 1.5rem/1 var(--display); display: grid; place-items: center; clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%); flex: none; overflow: hidden; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .profile-info h3 { margin: 0; font: italic 900 1.35rem/1.1 var(--display); color: var(--paper); text-transform: uppercase; }
 .profile-info p { margin: .25rem 0 0; font: 500 .8rem/1.3 var(--mono); color: var(--text-dim); }
 .profile-section { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--edge-soft); }
 .profile-section-title { margin: 0 0 .8rem; font: italic 900 1.1rem/1 var(--display); text-transform: uppercase; color: var(--aqua); }
+
+/* Interaktivitas Daftar Mahasiswa */
+.people li { cursor: pointer; transition: transform .15s var(--ease), background .15s var(--ease); outline: none; }
+.people li:hover, .people li:focus-visible { background: rgba(84, 237, 234, .12); border-color: var(--aqua); transform: translateX(4px); }
+.people li .nim-hint { display: block; font: 500 .65rem/1 var(--mono); color: var(--text-dim); margin-top: .15rem; }
+
+/* Detail Profil Mahasiswa Drawer */
+.profile-detail-card { background: var(--card); border: 2px solid var(--edge); padding: 1.25rem; margin-bottom: 1.25rem; animation: rise .3s var(--ease) both; }
+.profile-detail-top { display: flex; align-items: flex-start; gap: 1.1rem; margin-bottom: 1.2rem; }
+.profile-avatar-lg { width: 5.2rem; height: 5.2rem; background: var(--foam); color: var(--ink); font: italic 900 2rem/1 var(--display); display: grid; place-items: center; clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%); flex: none; overflow: hidden; border: 2px solid var(--aqua); }
+.profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+.profile-detail-names h3 { margin: 0; font: italic 900 1.5rem/1.1 var(--display); text-transform: uppercase; color: var(--paper); }
+.profile-detail-names .nim-tag { display: inline-block; font: 700 .75rem/1 var(--mono); color: var(--aqua); margin: .3rem 0; letter-spacing: .08em; }
+.profile-badge-row { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+.p-badge { display: inline-block; padding: .15rem .45rem; font: 700 .62rem/1.2 var(--mono); text-transform: uppercase; background: var(--sea-deep); border: 1px solid var(--edge); color: var(--paper); clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
+.p-badge.admin { background: var(--red); color: var(--paper); border-color: var(--red); }
+.p-badge.pengurus { background: var(--aqua); color: var(--ink); border-color: var(--aqua); }
+.profile-bio-box { background: var(--sea-deep); border-left: 3px solid var(--aqua); padding: .75rem 1rem; font: 500 .85rem/1.5 var(--sans); color: var(--paper); margin-bottom: 1rem; }
+.profile-tags-cloud { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.1rem; }
+.profile-tag-item { padding: .25rem .55rem; background: rgba(84, 237, 234, .1); border: 1px solid var(--edge); font: 500 .72rem/1 var(--mono); color: var(--aqua); transform: skewX(-8deg); }
+.profile-links-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .5rem; margin-top: .75rem; }
+.profile-link-btn { display: flex; align-items: center; gap: .4rem; padding: .5rem .75rem; background: var(--sea-deep); border: 1px solid var(--edge); color: var(--paper); text-decoration: none; font: 700 .75rem/1.2 var(--mono); transition: background .15s, border-color .15s; }
+.profile-link-btn:hover { background: rgba(84, 237, 234, .2); border-color: var(--aqua); color: var(--aqua); }
+
+/* Tombol Persona 3 Reload Button */
+.btn-p3 { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .55rem 1rem; background: var(--paper); border: 2px solid var(--ink); color: var(--ink); font: italic 900 .9rem/1 var(--display); text-transform: uppercase; cursor: pointer; transform: skewX(-10deg); transition: all .15s var(--ease); }
+.btn-p3 > * { transform: skewX(10deg); }
+.btn-p3:hover { background: var(--aqua); border-color: var(--paper); color: var(--ink); box-shadow: 2px 2px 0 var(--paper); }
+.btn-p3.btn-danger { background: var(--red); border-color: var(--paper); color: var(--paper); }
+.btn-p3.btn-danger:hover { background: #b31020; }
+.btn-p3.btn-subtle { background: transparent; border-color: var(--edge); color: var(--paper); }
+.btn-p3.btn-subtle:hover { background: rgba(255, 255, 255, .1); border-color: var(--aqua); }
+
+/* Badge Jadwal Pengganti & Reschedule */
+.reschedule-badge { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .55rem; font: 800 .7rem/1.2 var(--display); text-transform: uppercase; background: var(--red); color: var(--paper); border: 1px solid var(--paper); margin-top: .4rem; clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); animation: pulse 2s infinite; }
+.reschedule-badge.online { background: #0c6af5; }
+.reschedule-badge.batal { background: #555; text-decoration: line-through; }
+.reschedule-notice { background: rgba(255, 32, 51, .15); border: 1px solid var(--red); padding: .65rem .85rem; margin-top: .45rem; font: 500 .78rem/1.4 var(--mono); color: #ffd1d5; }
+.reschedule-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: .85rem; flex-wrap: wrap; gap: .5rem; }
+
+/* Tugas UI Filter & Tabs */
+.task-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .6rem; }
+.task-tabs { display: flex; gap: .4rem; }
+.task-tab { padding: .4rem .8rem; background: var(--card); border: 1px solid var(--edge); color: var(--text-dim); font: italic 800 .85rem/1 var(--display); text-transform: uppercase; cursor: pointer; transform: skewX(-10deg); }
+.task-tab[aria-selected="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); box-shadow: 2px 2px 0 var(--aqua); }
+.task-action-btns { display: flex; gap: .35rem; margin-top: .5rem; }
+.task-action-btn { padding: .25rem .5rem; font: 700 .65rem/1 var(--mono); background: var(--sea-deep); border: 1px solid var(--edge); color: var(--paper); cursor: pointer; }
+.task-action-btn:hover { background: var(--aqua); color: var(--ink); }
+
+/* Tautan Kategori Filter */
+.links-filter-row { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; }
+.links-filter-chip { padding: .35rem .65rem; background: var(--card); border: 1px solid var(--edge); color: var(--text-dim); font: 700 .68rem/1 var(--mono); text-transform: uppercase; cursor: pointer; transform: skewX(-8deg); }
+.links-filter-chip.active { background: var(--aqua); color: var(--ink); border-color: var(--aqua); }
+
 .motion > * { transform: skewX(10deg); }
 @media (hover: hover) and (pointer: fine) { .motion:hover { background: rgba(4, 18, 96, .6); } }
 body.open .motion { opacity: .25; }

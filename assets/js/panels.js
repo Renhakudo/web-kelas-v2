@@ -63,10 +63,13 @@ function makePanels(data, now = new Date()) {
     jadwal(day = hariAktif, rerender) {
       if (data.jadwal.error) return gagal(data.jadwal.error);
       const jadwal = data.jadwal.data;
-      // Tab keenam: kalender bulanan (tenggat tugas, UTS/UAS). day = "kalender" (bulan ini) atau "tahun-bulan"
+      const services = window.SDT && window.SDT.services;
+      const auth = window.SDT && window.SDT.auth;
       const kal = /^(kalender|\d{4}-\d+)$/.test(day);
+
       const tabs = KULIAH.map((d) => `<button class="tab" role="tab" type="button" id="tab-${d}" data-day="${d}" aria-selected="${d === day}" aria-controls="jadwal-hari" tabindex="${d === day ? 0 : -1}"><span><b>${d.slice(0, 3)}</b><small>${(jadwal[d] || []).length} sesi</small></span></button>`).join("")
         + `<button class="tab" role="tab" type="button" id="tab-kalender" data-day="kalender" aria-label="Kalender" aria-selected="${kal}" aria-controls="jadwal-hari" tabindex="${kal ? 0 : -1}"><span><b>Kal</b><small>Bulan</small></span></button>`;
+      
       const pasangTab = (body) => {
         const tabEls = [...body.querySelectorAll(".tab")];
         tabEls.forEach((t, i) => {
@@ -79,6 +82,7 @@ function makePanels(data, now = new Date()) {
           });
         });
       };
+
       if (kal) {
         const k = this.kalender(day === "kalender" ? undefined : day, rerender);
         return {
@@ -87,9 +91,12 @@ function makePanels(data, now = new Date()) {
           after(body) { pasangTab(body); k.after(body); }
         };
       }
+
       const nowM = now.getHours() * 60 + now.getMinutes();
       let nextFound = false;
       const sesi = jadwal[day] || [];
+      const overrides = (services && window.SDT.services_cache && window.SDT.services_cache.overrides) || [];
+
       const rows = sesi.map((s, i) => {
         let state = "";
         if (day === hariIni) {
@@ -97,12 +104,173 @@ function makePanels(data, now = new Date()) {
           else if (!nextFound && nowM < menit(s.mulai)) { state = "next"; nextFound = true; }
         }
         const status = state === "now" ? `<span class="tag now">Sedang berlangsung</span> ` : state === "next" ? `<span class="tag next">Berikutnya</span> ` : "";
-        return `<li class="${state}" style="--i:${i}"><span class="snum" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span><span class="tblock">${esc(s.mulai)} - ${esc(s.selesai)}</span><div><h3>${esc(s.matkul)}</h3><p><span translate="no">${esc(s.dosen.join(" / "))}</span> \u00b7 ${esc(s.ruang)}</p><p>PJ: <span translate="no">${esc(s.pj)}</span></p>${status}<span class="tag ${s.jenis === "praktikum" ? "red" : ""}">${esc(s.jenis)}</span></div></li>`;
+
+        // Reschedule override check
+        const ovr = overrides.find((o) => o.subject_id && (o.subject_id.toLowerCase().includes(s.matkul.toLowerCase()) || s.matkul.toLowerCase().includes(o.subject_id.toLowerCase())));
+        let ovrBadge = "";
+        let ovrNotice = "";
+        if (ovr) {
+          const tipe = ovr.tipe_perubahan || "pindah_jadwal";
+          if (tipe === "pindah_jadwal") {
+            ovrBadge = `<span class="reschedule-badge">⚠️ RESCHEDULE: ${esc(ovr.tanggal_pengganti || '')} ${esc(ovr.mulai_pengganti || '')}-${esc(ovr.selesai_pengganti || '')}</span>`;
+            ovrNotice = `<div class="reschedule-notice"><b>Jadwal Pengganti:</b> Dipindah ke ${esc(ovr.ruang_pengganti || 'Lab')} (${esc(ovr.keterangan || 'Penyesuaian dosen')})</div>`;
+          } else if (tipe === "online") {
+            ovrBadge = `<span class="reschedule-badge online">🌐 KULIAH DARING</span>`;
+            ovrNotice = `<div class="reschedule-notice"><b>Kuliah Daring:</b> ${esc(ovr.ruang_pengganti || 'Tautan akan dibagikan')} (${esc(ovr.keterangan || '')})</div>`;
+          } else if (tipe === "dibatalkan") {
+            ovrBadge = `<span class="reschedule-badge batal">❌ PERKULIAHAN DIBATALKAN</span>`;
+            ovrNotice = `<div class="reschedule-notice"><b>Dibatalkan:</b> ${esc(ovr.keterangan || 'Tidak ada perkuliahan pada tanggal ini.')}</div>`;
+          }
+        }
+
+        const canReschedule = auth && (auth.hasRole("admin") || (auth.isSubjectPJ && (auth.isSubjectPJ(s.matkul) || auth.isSubjectPJ(s.pj))));
+
+        return `<li class="${state}" style="--i:${i}">
+          <span class="snum" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+          <span class="tblock">${esc(s.mulai)} - ${esc(s.selesai)}</span>
+          <div>
+            <h3>${esc(s.matkul)}</h3>
+            <p><span translate="no">${esc(s.dosen.join(" / "))}</span> \u00b7 ${esc(s.ruang)}</p>
+            <p>PJ: <span translate="no">${esc(s.pj)}</span></p>
+            ${status}<span class="tag ${s.jenis === "praktikum" ? "red" : ""}">${esc(s.jenis)}</span>
+            ${ovrBadge}
+            ${ovrNotice}
+            ${canReschedule ? `
+              <div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap;">
+                <button type="button" class="task-action-btn btn-open-reschedule" data-matkul="${esc(s.matkul)}" data-ruang="${esc(s.ruang)}">
+                  <span>⚙️ Ajukan Reschedule</span>
+                </button>
+                ${ovr ? `<button type="button" class="task-action-btn btn-del-reschedule" data-id="${esc(ovr.$id)}" style="color:#ff8591;"><span>✕ Batalkan Reschedule</span></button>` : ""}
+              </div>
+            ` : ""}
+          </div>
+        </li>`;
       }).join("");
+
       return {
         sub: day === hariIni ? `${day} \u00b7 hari ini` : day,
-        html: `<div class="tabs" role="tablist" aria-label="Pilih hari">${tabs}</div><div role="tabpanel" id="jadwal-hari" aria-labelledby="tab-${day}">${sesi.length ? `<ul class="list sched">${rows}</ul>` : kosong("Tidak ada kuliah", `Belum ada sesi untuk hari ${esc(day)}.`)}</div>`,
-        after: pasangTab
+        html: `
+          <div class="tabs" role="tablist" aria-label="Pilih hari">${tabs}</div>
+
+          <div class="kas-form-card" id="form-reschedule-box" style="display:none;margin-bottom:1.25rem;">
+            <h3 style="font:italic 900 1.15rem var(--display);color:var(--aqua);margin:0 0 .85rem;text-transform:uppercase;">Ajukan Jadwal Pengganti (Reschedule)</h3>
+            <form class="auth-form" id="form-reschedule-new">
+              <input type="hidden" id="rs-matkul">
+              <div class="auth-field">
+                <label>Mata Kuliah</label>
+                <div id="rs-matkul-display" style="font:700 .9rem var(--display);color:var(--paper);padding:.4rem 0;"></div>
+              </div>
+              <div class="auth-field">
+                <label for="rs-tipe">Tipe Perubahan</label>
+                <select class="auth-input" id="rs-tipe">
+                  <option value="pindah_jadwal">Pindah Hari / Jam / Ruang</option>
+                  <option value="online">Kuliah Daring (Online)</option>
+                  <option value="dibatalkan">Perkuliahan Diliburkan / Dibatalkan</option>
+                </select>
+              </div>
+              <div class="auth-field">
+                <label for="rs-tgl-pengganti">Tanggal Pengganti</label>
+                <input type="date" id="rs-tgl-pengganti" class="auth-input" value="${new Date().toISOString().slice(0, 10)}">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                <div class="auth-field">
+                  <label for="rs-jam-mulai">Jam Mulai</label>
+                  <input type="text" id="rs-jam-mulai" class="auth-input" placeholder="08.00" value="08.00">
+                </div>
+                <div class="auth-field">
+                  <label for="rs-jam-selesai">Jam Selesai</label>
+                  <input type="text" id="rs-jam-selesai" class="auth-input" placeholder="09.40" value="09.40">
+                </div>
+              </div>
+              <div class="auth-field">
+                <label for="rs-ruang">Ruang / Tautan Online</label>
+                <input type="text" id="rs-ruang" class="auth-input" placeholder="contoh: Lab SAW 07.01 atau link Zoom">
+              </div>
+              <div class="auth-field">
+                <label for="rs-ket">Alasan / Keterangan Perubahan</label>
+                <input type="text" id="rs-ket" class="auth-input" placeholder="contoh: Dosen tugas dinas luar kota">
+              </div>
+              <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                <button type="submit" class="btn-p3" id="btn-save-rs"><span>Simpan Reschedule</span></button>
+                <button type="button" class="btn-p3 btn-subtle" id="btn-cancel-rs"><span>Batal</span></button>
+              </div>
+            </form>
+          </div>
+
+          <div role="tabpanel" id="jadwal-hari" aria-labelledby="tab-${day}">${sesi.length ? `<ul class="list sched">${rows}</ul>` : kosong("Tidak ada kuliah", `Belum ada sesi untuk hari ${esc(day)}.`)}</div>
+        `,
+        after(body) {
+          pasangTab(body);
+
+          // Preload schedule overrides
+          if (services && services.listScheduleOverrides && (!window.SDT.services_cache || !window.SDT.services_cache.overrides)) {
+            services.listScheduleOverrides().then((ovrs) => {
+              window.SDT.services_cache = window.SDT.services_cache || {};
+              window.SDT.services_cache.overrides = ovrs;
+              if (ovrs.length) rerender(day);
+            }).catch(() => {});
+          }
+
+          const formBox = body.querySelector("#form-reschedule-box");
+          const form = body.querySelector("#form-reschedule-new");
+          body.querySelectorAll(".btn-open-reschedule").forEach((b) => b.addEventListener("click", () => {
+            if (formBox) {
+              body.querySelector("#rs-matkul").value = b.dataset.matkul;
+              body.querySelector("#rs-matkul-display").textContent = b.dataset.matkul;
+              body.querySelector("#rs-ruang").value = b.dataset.ruang || "";
+              formBox.style.display = "block";
+              formBox.scrollIntoView({ behavior: "smooth" });
+            }
+          }));
+
+          body.querySelector("#btn-cancel-rs")?.addEventListener("click", () => {
+            if (formBox) formBox.style.display = "none";
+          });
+
+          body.querySelectorAll(".btn-del-reschedule").forEach((b) => b.addEventListener("click", async () => {
+            if (!confirm("Batalkan jadwal pengganti ini dan kembalikan ke jadwal reguler?")) return;
+            try {
+              await services.deleteScheduleOverride(b.dataset.id);
+              if (window.SDT.services_cache && window.SDT.services_cache.overrides) {
+                window.SDT.services_cache.overrides = window.SDT.services_cache.overrides.filter((o) => o.$id !== b.dataset.id);
+              }
+              rerender(day);
+            } catch (err) {
+              alert("Gagal membatalkan reschedule: " + err.message);
+            }
+          }));
+
+          if (form && services) {
+            form.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const saveBtn = body.querySelector("#btn-save-rs");
+              saveBtn.disabled = true;
+              try {
+                const created = await services.createScheduleOverride({
+                  subject_id: body.querySelector("#rs-matkul").value,
+                  tipe_perubahan: body.querySelector("#rs-tipe").value,
+                  tanggal_pengganti: body.querySelector("#rs-tgl-pengganti").value,
+                  mulai_pengganti: body.querySelector("#rs-jam-mulai").value,
+                  selesai_pengganti: body.querySelector("#rs-jam-selesai").value,
+                  ruang_pengganti: body.querySelector("#rs-ruang").value,
+                  keterangan: body.querySelector("#rs-ket").value,
+                  status: 'aktif'
+                });
+                window.SDT.services_cache = window.SDT.services_cache || {};
+                window.SDT.services_cache.overrides = window.SDT.services_cache.overrides || [];
+                if (created && !window.SDT.services_cache.overrides.some((o) => o.$id === created.$id)) {
+                  window.SDT.services_cache.overrides.unshift(created);
+                }
+                services.logActivity("jadwal", "reschedule", `${created.subject_id} -> ${created.tanggal_pengganti}`);
+                alert("Jadwal pengganti berhasil disimpan!");
+                rerender(day);
+              } catch (err) {
+                alert("Gagal menyimpan reschedule: " + err.message);
+                saveBtn.disabled = false;
+              }
+            });
+          }
+        }
       };
     },
 
@@ -113,6 +281,8 @@ function makePanels(data, now = new Date()) {
       const iso = (d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const tugas = (data.tugas.data || []).filter((p) => p.jenis === "tugas" && p.tenggat && p.tenggat.startsWith(iso(1).slice(0, 8)))
         .sort((a, b) => a.tenggat.localeCompare(b.tenggat));
+      const overrides = ((window.SDT.services_cache && window.SDT.services_cache.overrides) || [])
+        .filter((o) => o.tanggal_pengganti && o.tanggal_pengganti.startsWith(iso(1).slice(0, 8)));
       // Ujian hanya pada hari kuliah (Senin-Jumat) di minggu UTS/UAS
       const ujian = (d) => {
         const t = new Date(y, m - 1, d), w = sem && t.getDay() % 6 ? mingguKe(sem, t) : 0;
@@ -125,11 +295,14 @@ function makePanels(data, now = new Date()) {
       const baris = [];   // daftar di bawah kalender
       for (let d = 1; d <= jumlah; d++) {
         const t = new Date(y, m - 1, d), u = ujian(d), tg = tugas.filter((p) => p.tenggat === iso(d));
+        const ovs = overrides.filter((o) => o.tanggal_pengganti === iso(d));
         const kini = selisihHari(iso(d), now) === 0;
         if (u && (d === 1 || !ujian(d - 1))) baris.push([iso(d), `Minggu ${u}`, "Mulai tanggal ini sampai Jumat"]);
         tg.forEach((p) => baris.push([p.tenggat, p.judul, `Tenggat tugas \u00b7 ${p.matkul || ""}`]));
-        const kelas = [kini && "kini", t.getDay() === 6 && "sab", t.getDay() === 0 && "min", u && "ujian", tg.length && "tugas"].filter(Boolean).join(" ");
-        sel += `<li class="${kelas}"${kini ? ' aria-current="date"' : ""}>${d}<small>${u}</small>${tg.length ? `<span class="sr-only">, tenggat: ${esc(tg.map((p) => p.judul).join(", "))}</span>` : ""}</li>`;
+        ovs.forEach((o) => baris.push([o.tanggal_pengganti, `Reschedule: ${o.subject_id}`, `${o.mulai_pengganti || ""}-${o.selesai_pengganti || ""} \u00b7 ${o.ruang_pengganti || ""} (${o.keterangan || o.tipe_perubahan})`]));
+        const kelas = [kini && "kini", t.getDay() === 6 && "sab", t.getDay() === 0 && "min", (u || ovs.length) && "ujian", tg.length && "tugas"].filter(Boolean).join(" ");
+        const badgeTxt = u || (ovs.length ? "RSC" : "");
+        sel += `<li class="${kelas}"${kini ? ' aria-current="date"' : ""}>${d}<small>${badgeTxt}</small>${tg.length ? `<span class="sr-only">, tenggat: ${esc(tg.map((p) => p.judul).join(", "))}</span>` : ""}</li>`;
       }
       const daftar = baris.length
         ? `<ul class="list">${baris.map(([tgl, judul, ket], i) => `<li style="--i:${i}"><span class="time">${tanggal(tgl)}</span><div><h3>${esc(judul)}</h3><p>${esc(ket)}</p></div></li>`).join("")}</ul>`
@@ -147,23 +320,283 @@ function makePanels(data, now = new Date()) {
       };
     },
 
-    anggota() {
+    anggota(selectedNim, rerender) {
       if (data.anggota.error) return gagal(data.anggota.error);
-      const sorted = [...data.anggota.data.mahasiswa].sort((a, b) => a.localeCompare(b, "id"));
+      const rawList = [...data.anggota.data.mahasiswa];
+      const sorted = [...rawList].sort((a, b) => a.localeCompare(b, "id"));
+      const services = window.SDT && window.SDT.services;
+      const auth = window.SDT && window.SDT.auth;
+
+      // Jika ada selectedNim, tampilkan SIDE DRAWER DETAIL PROFIL MAHASISWA
+      if (selectedNim) {
+        const nimStr = String(selectedNim);
+        let profile = null;
+        if (services && window.SDT.services_cache && window.SDT.services_cache.profiles) {
+          profile = window.SDT.services_cache.profiles.find((p) => p.nim === nimStr || p.$id === nimStr || p.nama_lengkap === nimStr);
+        }
+        if (!profile) {
+          const idx = sorted.findIndex((n) => n === nimStr);
+          const nama = idx >= 0 ? sorted[idx] : nimStr;
+          const originalIdx = rawList.indexOf(nama);
+          const computedNim = originalIdx >= 0 ? String(3326600001 + originalIdx) : nimStr;
+          profile = {
+            $id: `usr-${computedNim}`,
+            nim: computedNim,
+            nama_lengkap: nama,
+            role: (nama.includes("Arkoun") || nama.includes("Azzam")) ? "admin" : "mahasiswa",
+            jabatan: nama.includes("Arkoun") ? "Admin & Web Master" : nama.includes("Azzam") ? "Komandan Tingkat" : "Mahasiswa",
+            bio: "Mahasiswa Sains Data Terapan A PENS.",
+            minat: ["Data Science", "Machine Learning"],
+            matkul_pj: [],
+            github_url: "",
+            linkedin_url: "",
+            instagram_url: "",
+            website_url: "",
+            foto_id: ""
+          };
+        }
+
+        const isOwner = auth && auth.state && auth.state.profile && (auth.state.profile.nim === profile.nim || (auth.state.user && auth.state.user.$id === profile.$id));
+        const isAdmin = auth && auth.hasRole && auth.hasRole("admin");
+        const canEdit = isOwner || isAdmin;
+        const avatarUrl = services && services.getAvatarViewUrl ? services.getAvatarViewUrl(profile.foto_id) : null;
+
+        const html = `
+          <div style="margin-bottom:1rem;">
+            <button type="button" class="btn-p3 btn-subtle" id="btn-back-anggota">
+              <span>&larr; Kembali ke Daftar</span>
+            </button>
+          </div>
+
+          <div class="profile-detail-card" id="view-profile-card">
+            <div class="profile-detail-top">
+              <div class="profile-avatar-lg">
+                ${avatarUrl ? `<img src="${esc(avatarUrl)}" alt="${esc(profile.nama_lengkap)}">` : `<span>${initials(profile.nama_lengkap)}</span>`}
+              </div>
+              <div class="profile-detail-names">
+                <span class="nim-tag">NRP ${esc(profile.nim)}</span>
+                <h3>${esc(profile.nama_lengkap)}</h3>
+                <div class="profile-badge-row">
+                  <span class="p-badge ${esc(profile.role)}">${esc(profile.role || 'mahasiswa')}</span>
+                  <span class="p-badge">${esc(profile.jabatan || 'Mahasiswa')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="profile-bio-box">
+              ${esc(profile.bio || "Belum ada bio yang ditulis.")}
+            </div>
+
+            ${(profile.minat && profile.minat.length) ? `
+              <div style="margin-bottom:.6rem;"><strong style="font:700 .68rem var(--mono);text-transform:uppercase;color:var(--text-dim);letter-spacing:.08em;">Minat &amp; Bidang Keahlian:</strong></div>
+              <div class="profile-tags-cloud">
+                ${profile.minat.map((m) => `<span class="profile-tag-item">${esc(m)}</span>`).join("")}
+              </div>
+            ` : ""}
+
+            ${(profile.matkul_pj && profile.matkul_pj.length && profile.matkul_pj[0] !== "") ? `
+              <div style="margin-bottom:.6rem;"><strong style="font:700 .68rem var(--mono);text-transform:uppercase;color:var(--text-dim);letter-spacing:.08em;">PJ Mata Kuliah:</strong></div>
+              <div class="profile-tags-cloud">
+                ${profile.matkul_pj.map((pj) => `<span class="profile-tag-item" style="color:var(--foam);">${esc(pj)}</span>`).join("")}
+              </div>
+            ` : ""}
+
+            <div style="margin-top:1rem;margin-bottom:.5rem;"><strong style="font:700 .68rem var(--mono);text-transform:uppercase;color:var(--text-dim);letter-spacing:.08em;">Tautan &amp; Jejaring:</strong></div>
+            <div class="profile-links-row">
+              ${profile.github_url ? `<a class="profile-link-btn" href="${esc(profile.github_url)}" target="_blank" rel="noopener"><span>🐙 GitHub</span></a>` : ""}
+              ${profile.linkedin_url ? `<a class="profile-link-btn" href="${esc(profile.linkedin_url)}" target="_blank" rel="noopener"><span>💼 LinkedIn</span></a>` : ""}
+              ${profile.instagram_url ? `<a class="profile-link-btn" href="${esc(profile.instagram_url)}" target="_blank" rel="noopener"><span>📸 Instagram</span></a>` : ""}
+              ${profile.website_url ? `<a class="profile-link-btn" href="${esc(profile.website_url)}" target="_blank" rel="noopener"><span>🌐 Website</span></a>` : ""}
+              ${(!profile.github_url && !profile.linkedin_url && !profile.instagram_url && !profile.website_url) ? `<p style="font-size:.78rem;color:var(--text-dim);margin:0;">Belum ada tautan media sosial.</p>` : ""}
+            </div>
+
+            ${canEdit ? `
+              <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--edge-soft);">
+                <button type="button" class="btn-p3" id="btn-toggle-edit-profile">
+                  <span>✏️ Sunting Profil Ini</span>
+                </button>
+              </div>
+            ` : ""}
+          </div>
+
+          ${canEdit ? `
+            <div class="profile-detail-card" id="form-edit-profile-card" style="display:none;">
+              <h3 style="font:italic 900 1.25rem var(--display);color:var(--aqua);margin:0 0 1rem;text-transform:uppercase;">Sunting Profil Mahasiswa</h3>
+              
+              <div class="auth-error" id="edit-prof-err"></div>
+              <div class="auth-success" id="edit-prof-succ"></div>
+
+              <form class="auth-form" id="form-prof-edit">
+                <div class="auth-field">
+                  <label for="ep-avatar">Foto Profil Baru (Maks 2MB, JPG/PNG/WebP)</label>
+                  <input type="file" id="ep-avatar" accept="image/jpeg,image/png,image/webp" class="auth-input" style="padding:.4rem;">
+                </div>
+                <div class="auth-field">
+                  <label for="ep-bio">Bio Singkat</label>
+                  <textarea class="auth-textarea" id="ep-bio">${esc(profile.bio || '')}</textarea>
+                </div>
+                <div class="auth-field">
+                  <label for="ep-minat">Minat / Keahlian (Pisahkan dengan koma)</label>
+                  <input type="text" class="auth-input" id="ep-minat" value="${esc((profile.minat || []).join(', '))}">
+                </div>
+                ${isAdmin ? `
+                  <div class="auth-field">
+                    <label for="ep-jabatan">Jabatan (Khusus Admin)</label>
+                    <input type="text" class="auth-input" id="ep-jabatan" value="${esc(profile.jabatan || 'Mahasiswa')}">
+                  </div>
+                ` : ""}
+                <div class="auth-field">
+                  <label for="ep-github">GitHub URL</label>
+                  <input type="url" class="auth-input" id="ep-github" placeholder="https://github.com/..." value="${esc(profile.github_url || '')}">
+                </div>
+                <div class="auth-field">
+                  <label for="ep-linkedin">LinkedIn URL</label>
+                  <input type="url" class="auth-input" id="ep-linkedin" placeholder="https://linkedin.com/in/..." value="${esc(profile.linkedin_url || '')}">
+                </div>
+                <div class="auth-field">
+                  <label for="ep-instagram">Instagram URL</label>
+                  <input type="url" class="auth-input" id="ep-instagram" placeholder="https://instagram.com/..." value="${esc(profile.instagram_url || '')}">
+                </div>
+                <div class="auth-field">
+                  <label for="ep-website">Website Pribadi</label>
+                  <input type="url" class="auth-input" id="ep-website" placeholder="https://..." value="${esc(profile.website_url || '')}">
+                </div>
+                <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                  <button type="submit" class="btn-p3" id="btn-save-prof"><span>Simpan Perubahan</span></button>
+                  <button type="button" class="btn-p3 btn-subtle" id="btn-cancel-prof"><span>Batal</span></button>
+                </div>
+              </form>
+            </div>
+          ` : ""}
+        `;
+
+        return {
+          sub: `Profil ${profile.nama_lengkap}`,
+          html,
+          after(b) {
+            b.querySelector("#btn-back-anggota")?.addEventListener("click", () => rerender(null));
+            const toggleBtn = b.querySelector("#btn-toggle-edit-profile");
+            const formCard = b.querySelector("#form-edit-profile-card");
+            const cancelBtn = b.querySelector("#btn-cancel-prof");
+            const form = b.querySelector("#form-prof-edit");
+            const errEl = b.querySelector("#edit-prof-err");
+            const succEl = b.querySelector("#edit-prof-succ");
+            const saveBtn = b.querySelector("#btn-save-prof");
+
+            if (toggleBtn && formCard) {
+              toggleBtn.addEventListener("click", () => {
+                formCard.style.display = "block";
+                formCard.scrollIntoView({ behavior: "smooth" });
+              });
+            }
+            if (cancelBtn && formCard) {
+              cancelBtn.addEventListener("click", () => {
+                formCard.style.display = "none";
+              });
+            }
+            if (form) {
+              form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                errEl.classList.remove("show");
+                succEl.classList.remove("show");
+                saveBtn.disabled = true;
+                saveBtn.querySelector("span").textContent = "Menyimpan…";
+
+                try {
+                  let fotoId = profile.foto_id;
+                  const fileInput = b.querySelector("#ep-avatar");
+                  if (fileInput && fileInput.files && fileInput.files[0]) {
+                    const uploaded = await services.uploadAvatar(fileInput.files[0]);
+                    fotoId = uploaded.$id;
+                  }
+
+                  const minatArr = b.querySelector("#ep-minat").value.split(",").map((s) => s.trim()).filter(Boolean);
+                  const updatePayload = {
+                    bio: b.querySelector("#ep-bio").value.trim(),
+                    minat: minatArr,
+                    github_url: b.querySelector("#ep-github").value.trim(),
+                    linkedin_url: b.querySelector("#ep-linkedin").value.trim(),
+                    instagram_url: b.querySelector("#ep-instagram").value.trim(),
+                    website_url: b.querySelector("#ep-website").value.trim(),
+                    foto_id: fotoId
+                  };
+                  if (isAdmin && b.querySelector("#ep-jabatan")) {
+                    updatePayload.jabatan = b.querySelector("#ep-jabatan").value.trim();
+                  }
+
+                  await services.updateProfile(profile.$id, updatePayload);
+                  if (isOwner && auth && auth.updateProfile) {
+                    await auth.updateProfile(updatePayload);
+                  }
+
+                  succEl.textContent = "Profil berhasil disimpan!";
+                  succEl.classList.add("show");
+                  setTimeout(() => {
+                    rerender(profile.nim);
+                  }, 800);
+                } catch (err) {
+                  errEl.textContent = err.message || "Gagal menyimpan profil.";
+                  errEl.classList.add("show");
+                  saveBtn.disabled = false;
+                  saveBtn.querySelector("span").textContent = "Simpan Perubahan";
+                }
+              });
+            }
+          }
+        };
+      }
+
+      // Default: List 24 Mahasiswa
       return {
-        sub: `${sorted.length} mahasiswa`,
-        html: `<label class="sr-only" for="cari">Cari nama</label><input class="search" id="cari" name="cari" type="search" placeholder="Cari nama mahasiswa\u2026" autocomplete="off" spellcheck="false"><p class="count" id="count" aria-live="polite"></p><ul class="people" id="people" translate="no"></ul>`,
+        sub: `${sorted.length} mahasiswa · Klik nama untuk profil`,
+        html: `<label class="sr-only" for="cari">Cari nama atau NRP</label><input class="search" id="cari" name="cari" type="search" placeholder="Cari nama atau NRP mahasiswa\u2026" autocomplete="off" spellcheck="false"><p class="count" id="count" aria-live="polite"></p><ul class="people" id="people" translate="no"></ul>`,
         after(body) {
           const count = body.querySelector("#count"), list = body.querySelector("#people");
+          if (services && services.listProfiles) {
+            services.listProfiles().then((pList) => {
+              window.SDT.services_cache = window.SDT.services_cache || {};
+              window.SDT.services_cache.profiles = pList;
+            }).catch(() => {});
+          }
+
           const draw = (q = "") => {
-            const hit = sorted.filter((n) => n.toLowerCase().includes(q.trim().toLowerCase()));
-            count.textContent = q ? `${hit.length} dari ${sorted.length} nama` : `${sorted.length} nama, urut abjad`;
+            const hit = sorted.filter((n, i) => {
+              const origIdx = rawList.indexOf(n);
+              const nrp = String(3326600001 + (origIdx >= 0 ? origIdx : i));
+              const query = q.trim().toLowerCase();
+              return n.toLowerCase().includes(query) || nrp.includes(query);
+            });
+            count.textContent = q ? `${hit.length} dari ${sorted.length} nama` : `${sorted.length} nama, urut abjad (klik untuk melihat profil)`;
             list.innerHTML = hit.length
-              ? hit.map((n, i) => `<li style="--i:${i}"><span class="initial" aria-hidden="true">${initials(n)}</span><span>${esc(n)}</span></li>`).join("")
+              ? hit.map((n, i) => {
+                  const origIdx = rawList.indexOf(n);
+                  const nrp = String(3326600001 + (origIdx >= 0 ? origIdx : i));
+                  return `<li style="--i:${i}" tabindex="0" data-nim="${nrp}" role="button" aria-label="Buka profil ${esc(n)}">
+                    <span class="initial" aria-hidden="true">${initials(n)}</span>
+                    <div>
+                      <span>${esc(n)}</span>
+                      <small class="nim-hint">NRP ${nrp}</small>
+                    </div>
+                  </li>`;
+                }).join("")
               : `<li style="grid-column:1/-1;justify-content:center">Tidak ada nama yang cocok dengan "${esc(q)}"</li>`;
           };
           draw();
           body.querySelector("#cari").addEventListener("input", (e) => draw(e.target.value));
+
+          list.addEventListener("click", (e) => {
+            const li = e.target.closest("li[data-nim]");
+            if (li) rerender(li.dataset.nim);
+          });
+          list.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              const li = e.target.closest("li[data-nim]");
+              if (li) {
+                e.preventDefault();
+                rerender(li.dataset.nim);
+              }
+            }
+          });
         }
       };
     },
@@ -171,7 +604,6 @@ function makePanels(data, now = new Date()) {
     pengurus() {
       if (data.anggota.error) return gagal(data.anggota.error);
       const { dosenWali, pengurus, pengembang } = data.anggota.data;
-      // Gabungkan jabatan yang sama (mis. dua sekretaris) dalam satu kartu, urutan dipertahankan
       const grup = [];
       pengurus.forEach((p) => {
         const g = grup.find((x) => x.jabatan === p.jabatan);
@@ -179,7 +611,6 @@ function makePanels(data, now = new Date()) {
       });
       const cards = grup.map((p, i) => `<div class="officer" style="--i:${i + 1}"><div class="num" aria-hidden="true">${ROMAWI[i] || i + 1}</div><p class="role">${esc(p.jabatan)}</p><p translate="no">${p.nama.map(esc).join("<br>")}</p></div>`).join("");
 
-      // Tim Pengembang Website
       const devList = pengembang || [
         { peran: "Frontend & Core Feature", nama: ["Mohammad Aditya Arkoun"], ket: "Arsitektur antarmuka, tata letak interaktif, sistem menu, dan fitur inti website." },
         { peran: "Backend & Database", nama: ["Muhammad Hilmi Mu'Afa"], ket: "Struktur data, integrasi database & penyimpanan, serta arsitektur backend." },
@@ -197,33 +628,362 @@ function makePanels(data, now = new Date()) {
       };
     },
 
-    tugas() {
-      if (data.tugas.error) return gagal(data.tugas.error);
-      const list = data.tugas.data.filter((p) => p.jenis === "tugas");
-      if (!list.length) return { sub: "Tugas dan tenggat", html: kosong("Belum ada tugas", 'Tambahkan item berjenis <code>"tugas"</code> beserta mata kuliah dan tenggat di <code>data/tugas.js</code>.') };
-      const sisaHari = (t) => selisihHari(t, now);
-      // Yang masih berjalan di atas (tenggat terdekat dulu), yang sudah lewat di bawah
-      const sorted = [...list].sort((a, b) => {
-        const sa = sisaHari(a.tenggat), sb = sisaHari(b.tenggat);
-        if ((sa < 0) !== (sb < 0)) return sa < 0 ? 1 : -1;
-        return sa < 0 ? sb - sa : sa - sb;
-      });
-      const rows = sorted.map((p, i) => {
-        const h = sisaHari(p.tenggat);
-        const label = h < 0 ? `<span class="tag done">Lewat</span>` : h === 0 ? `<span class="tag now">Hari ini</span>` : `<span class="tag due">H-${h}</span>`;
-        return `<li class="${h < 0 ? "past" : ""}" style="--i:${i}"><span class="time">${tanggal(p.tenggat)}</span><div><h3>${esc(p.judul)}</h3><p>${esc(p.matkul || "")}</p><p>${esc(p.isi)}</p><p>${tautan(p.tautan, "Buka tautan")}</p>${label}</div></li>`;
-      }).join("");
-      return { sub: "Urut tenggat terdekat", html: `<ul class="list">${rows}</ul>` };
+    tugas(activeTab = "aktif", rerender) {
+      const services = window.SDT && window.SDT.services;
+      const auth = window.SDT && window.SDT.auth;
+      const canManage = auth && (auth.hasRole("admin") || auth.hasRole("pengurus"));
+      const isArsip = activeTab === "arsip";
+
+      return {
+        sub: isArsip ? "Dokumentasi tugas yang telah lewat" : "Tugas aktif dan tenggat terdekat",
+        html: `
+          <div class="task-header-row">
+            <div class="task-tabs" role="tablist">
+              <button type="button" class="task-tab" id="tt-aktif" aria-selected="${!isArsip}"><span>Tugas Aktif</span></button>
+              <button type="button" class="task-tab" id="tt-arsip" aria-selected="${isArsip}"><span>Arsip Tugas</span></button>
+            </div>
+            ${canManage ? `<button type="button" class="btn-p3" id="btn-tambah-tugas" style="padding:.35rem .75rem;font-size:.78rem;"><span>+ Tambah Tugas</span></button>` : ""}
+          </div>
+
+          ${canManage ? `
+            <div class="kas-form-card" id="form-tugas-box" style="display:none;margin-bottom:1.25rem;">
+              <h3 id="form-tugas-title" style="font:italic 900 1.15rem var(--display);color:var(--aqua);margin:0 0 .85rem;text-transform:uppercase;">Tambah Tugas Baru</h3>
+              <form class="auth-form" id="form-tugas-new">
+                <input type="hidden" id="tg-edit-id" value="">
+                <div class="auth-field">
+                  <label for="tg-judul">Judul Tugas</label>
+                  <input type="text" id="tg-judul" class="auth-input" required placeholder="contoh: Laporan Praktikum Jaringan M05">
+                </div>
+                <div class="auth-field">
+                  <label for="tg-matkul">Mata Kuliah</label>
+                  <input type="text" id="tg-matkul" class="auth-input" required placeholder="contoh: Workshop Sistem Operasi dan Jaringan">
+                </div>
+                <div class="auth-field">
+                  <label for="tg-deadline">Tenggat (Deadline)</label>
+                  <input type="datetime-local" id="tg-deadline" class="auth-input" required>
+                </div>
+                <div class="auth-field">
+                  <label for="tg-link">Tautan Pengumpulan / LMS (Opsional)</label>
+                  <input type="url" id="tg-link" class="auth-input" placeholder="https://online.mis.pens.ac.id/...">
+                </div>
+                <div class="auth-field">
+                  <label for="tg-desc">Deskripsi &amp; Petunjuk</label>
+                  <textarea id="tg-desc" class="auth-textarea" placeholder="Rincian ketentuan tugas..."></textarea>
+                </div>
+                <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                  <button type="submit" class="btn-p3" id="btn-save-tugas"><span>Simpan Tugas</span></button>
+                  <button type="button" class="btn-p3 btn-subtle" id="btn-cancel-tugas"><span>Batal</span></button>
+                </div>
+              </form>
+            </div>
+          ` : ""}
+
+          <div class="auth-field" style="margin-bottom:.75rem;">
+            <label for="filter-tugas-matkul" class="sr-only">Filter Mata Kuliah</label>
+            <select id="filter-tugas-matkul" class="auth-input" style="padding:.45rem .7rem;font-size:.82rem;">
+              <option value="all">Semua Mata Kuliah</option>
+            </select>
+          </div>
+
+          <div id="tugas-content-placeholder">
+            <p class="count" id="count-tugas">Memuat tugas...</p>
+            <ul class="list" id="tugas-list"></ul>
+          </div>
+        `,
+        after(body) {
+          body.querySelector("#tt-aktif")?.addEventListener("click", () => rerender("aktif"));
+          body.querySelector("#tt-arsip")?.addEventListener("click", () => rerender("arsip"));
+
+          const formBox = body.querySelector("#form-tugas-box");
+          const newForm = body.querySelector("#form-tugas-new");
+          const editIdInput = body.querySelector("#tg-edit-id");
+          const formTitle = body.querySelector("#form-tugas-title");
+          body.querySelector("#btn-tambah-tugas")?.addEventListener("click", () => {
+            if (!formBox) return;
+            if (editIdInput) editIdInput.value = "";
+            if (formTitle) formTitle.textContent = "Tambah Tugas Baru";
+            if (newForm) newForm.reset();
+            formBox.style.display = formBox.style.display === "none" ? "block" : "none";
+          });
+          body.querySelector("#btn-cancel-tugas")?.addEventListener("click", () => {
+            if (formBox) formBox.style.display = "none";
+            if (editIdInput) editIdInput.value = "";
+          });
+
+          if (newForm && services) {
+            newForm.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const saveBtn = body.querySelector("#btn-save-tugas");
+              saveBtn.disabled = true;
+              try {
+                const deadlineVal = body.querySelector("#tg-deadline").value;
+                const payload = {
+                  judul: body.querySelector("#tg-judul").value.trim(),
+                  subject_id: body.querySelector("#tg-matkul").value.trim(),
+                  deadline: deadlineVal ? new Date(deadlineVal).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                  link_pengumpulan: body.querySelector("#tg-link").value.trim(),
+                  deskripsi: body.querySelector("#tg-desc").value.trim()
+                };
+                const editId = editIdInput ? editIdInput.value : "";
+                if (editId) {
+                  await services.updateAssignment(editId, payload);
+                  services.logActivity("tugas", "update", payload.judul);
+                } else {
+                  payload.status = 'aktif';
+                  await services.createAssignment(payload);
+                  services.logActivity("tugas", "create", payload.judul);
+                }
+                rerender(activeTab);
+              } catch (err) {
+                alert("Gagal menyimpan tugas: " + err.message);
+                saveBtn.disabled = false;
+              }
+            });
+          }
+
+          const countEl = body.querySelector("#count-tugas");
+          const listEl = body.querySelector("#tugas-list");
+          const matkulFilter = body.querySelector("#filter-tugas-matkul");
+          const sisaHari = (t) => selisihHari(t, now);
+          let loadedItems = [];
+
+          const renderItems = (items) => {
+            loadedItems = items;
+            const selectedMatkul = matkulFilter ? matkulFilter.value : "all";
+            const listFiltered = items.filter((p) => {
+              const h = sisaHari(p.deadline);
+              const matchTab = isArsip ? (h < 0 || p.status === 'arsip') : (h >= 0 && p.status !== 'arsip');
+              const matchMatkul = selectedMatkul === "all" || (p.subject_id || "") === selectedMatkul;
+              return matchTab && matchMatkul;
+            }).sort((a, b) => {
+              const sa = sisaHari(a.deadline), sb = sisaHari(b.deadline);
+              return isArsip ? sb - sa : sa - sb;
+            });
+
+            countEl.textContent = `${listFiltered.length} ${isArsip ? 'tugas dalam arsip' : 'tugas aktif'}`;
+            if (!listFiltered.length) {
+              listEl.innerHTML = `<li style="grid-column:1/-1;justify-content:center;padding:2rem;">${isArsip ? "Belum ada tugas yang diarsipkan." : "Tidak ada tugas aktif saat ini. Semua beres!"}</li>`;
+              return;
+            }
+
+            listEl.innerHTML = listFiltered.map((p, i) => {
+              const h = sisaHari(p.deadline);
+              const label = h < 0 ? `<span class="tag done">Lewat</span>` : h === 0 ? `<span class="tag now">Hari ini</span>` : `<span class="tag due">H-${h}</span>`;
+              return `<li class="${h < 0 ? "past" : ""}" style="--i:${i}">
+                <span class="time">${tanggal(p.deadline)}</span>
+                <div>
+                  <h3>${esc(p.judul)}</h3>
+                  <p><b style="color:var(--aqua);">${esc(p.subject_id || "")}</b></p>
+                  <p>${esc(p.deskripsi || "")}</p>
+                  ${p.link_pengumpulan ? `<p>${tautan(p.link_pengumpulan, "Buka Tautan Pengumpulan")}</p>` : ""}
+                  ${label}
+                  ${canManage ? `
+                    <div class="task-action-btns">
+                      <button type="button" class="task-action-btn btn-edit-task" data-id="${esc(p.$id)}">✏️ Edit</button>
+                      <button type="button" class="task-action-btn btn-archive-task" data-id="${esc(p.$id)}">${isArsip ? 'Aktifkan Kembali' : 'Arsipkan'}</button>
+                      <button type="button" class="task-action-btn btn-del-task" data-id="${esc(p.$id)}" style="color:#ff8591;">Hapus</button>
+                    </div>
+                  ` : ""}
+                </div>
+              </li>`;
+            }).join("");
+
+            listEl.querySelectorAll(".btn-edit-task").forEach((b) => b.addEventListener("click", () => {
+              const item = loadedItems.find((x) => x.$id === b.dataset.id);
+              if (!item || !formBox) return;
+              if (editIdInput) editIdInput.value = item.$id;
+              if (formTitle) formTitle.textContent = "Edit Tugas";
+              body.querySelector("#tg-judul").value = item.judul || "";
+              body.querySelector("#tg-matkul").value = item.subject_id || "";
+              body.querySelector("#tg-deadline").value = item.deadline ? `${item.deadline.slice(0, 10)}T23:59` : "";
+              body.querySelector("#tg-link").value = item.link_pengumpulan || "";
+              body.querySelector("#tg-desc").value = item.deskripsi || "";
+              formBox.style.display = "block";
+              formBox.scrollIntoView({ behavior: "smooth" });
+            }));
+            listEl.querySelectorAll(".btn-archive-task").forEach((b) => b.addEventListener("click", async () => {
+              try {
+                await services.updateAssignment(b.dataset.id, { status: isArsip ? 'aktif' : 'arsip' });
+                rerender(activeTab);
+              } catch (e) { alert(e.message); }
+            }));
+            listEl.querySelectorAll(".btn-del-task").forEach((b) => b.addEventListener("click", async () => {
+              if (confirm("Hapus tugas ini secara permanen?")) {
+                try {
+                  await services.deleteAssignment(b.dataset.id);
+                  rerender(activeTab);
+                } catch (e) { alert(e.message); }
+              }
+            }));
+          };
+
+          if (matkulFilter) {
+            matkulFilter.addEventListener("change", () => renderItems(loadedItems));
+          }
+
+          if (services && services.listAssignments) {
+            services.listAssignments().then((res) => {
+              if (matkulFilter) {
+                const subjects = [...new Set(res.map((x) => x.subject_id).filter(Boolean))].sort();
+                subjects.forEach((s) => {
+                  const opt = document.createElement("option");
+                  opt.value = s;
+                  opt.textContent = s;
+                  matkulFilter.appendChild(opt);
+                });
+              }
+              renderItems(res);
+            }).catch(() => {
+              renderItems([]);
+            });
+          } else {
+            renderItems([]);
+          }
+        }
+      };
     },
 
-    tautan() {
-      if (data.tautan.error) return gagal(data.tautan.error);
-      const rows = data.tautan.data.map((t, i) => {
-        const a = tautan(t.url, t.judul);
-        return a && `<li style="--i:${i}"><span class="time">${esc(t.kategori || "")}</span><div><h3>${a}</h3><p>${esc(t.keterangan || "")}</p></div></li>`;
-      }).join("");
-      if (!rows) return { sub: "Tautan penting kelas", html: kosong("Belum ada tautan", "Tambahkan tautan (LMS, Drive, formulir) di <code>data/tautan.js</code>.") };
-      return { sub: "Dibuka di tab baru", html: `<ul class="list">${rows}</ul>` };
+    tautan(filterCat = "Semua", rerender) {
+      const services = window.SDT && window.SDT.services;
+      const auth = window.SDT && window.SDT.auth;
+      const canManage = auth && (auth.hasRole("admin") || auth.hasRole("pengurus"));
+      const CATEGORIES = ["Semua", "Akademik", "Materi", "Tugas", "Event", "Tools", "Dokumentasi", "Lainnya"];
+
+      return {
+        sub: "Pusat kumpulan tautan dan portal penting kelas",
+        html: `
+          <div class="links-filter-row">
+            ${CATEGORIES.map((cat) => `
+              <button type="button" class="links-filter-chip ${cat === filterCat ? 'active' : ''}" data-cat="${esc(cat)}">
+                <span>${esc(cat)}</span>
+              </button>
+            `).join("")}
+          </div>
+
+          ${canManage ? `
+            <div style="margin-bottom:1rem;">
+              <button type="button" class="btn-p3" id="btn-tambah-tautan" style="font-size:.78rem;padding:.35rem .75rem;">
+                <span>+ Tambah Tautan Baru</span>
+              </button>
+            </div>
+
+            <div class="kas-form-card" id="form-tautan-box" style="display:none;margin-bottom:1.25rem;">
+              <h3 style="font:italic 900 1.15rem var(--display);color:var(--aqua);margin:0 0 .85rem;text-transform:uppercase;">Tambah Tautan Baru</h3>
+              <form class="auth-form" id="form-tautan-new">
+                <div class="auth-field">
+                  <label for="lt-judul">Judul Tautan / Sumber</label>
+                  <input type="text" id="lt-judul" class="auth-input" required placeholder="contoh: Google Drive Materi Statistika">
+                </div>
+                <div class="auth-field">
+                  <label for="lt-url">Alamat URL (http/https)</label>
+                  <input type="url" id="lt-url" class="auth-input" required placeholder="https://drive.google.com/...">
+                </div>
+                <div class="auth-field">
+                  <label for="lt-cat">Kategori</label>
+                  <select class="auth-input" id="lt-cat">
+                    <option value="Akademik">Akademik</option>
+                    <option value="Materi">Materi</option>
+                    <option value="Tugas">Tugas</option>
+                    <option value="Event">Event</option>
+                    <option value="Tools">Tools</option>
+                    <option value="Dokumentasi">Dokumentasi</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+                <div class="auth-field">
+                  <label for="lt-desc">Keterangan Singkat</label>
+                  <input type="text" id="lt-desc" class="auth-input" placeholder="contoh: Folder slide kuliah dan rekaman zoom">
+                </div>
+                <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                  <button type="submit" class="btn-p3" id="btn-save-link"><span>Simpan Tautan</span></button>
+                  <button type="button" class="btn-p3 btn-subtle" id="btn-cancel-link"><span>Batal</span></button>
+                </div>
+              </form>
+            </div>
+          ` : ""}
+
+          <div id="tautan-container">
+            <p class="count" id="count-tautan">Memuat tautan...</p>
+            <ul class="list" id="tautan-list"></ul>
+          </div>
+        `,
+        after(body) {
+          body.querySelectorAll(".links-filter-chip").forEach((b) => b.addEventListener("click", () => {
+            rerender(b.dataset.cat);
+          }));
+
+          const formBox = body.querySelector("#form-tautan-box");
+          body.querySelector("#btn-tambah-tautan")?.addEventListener("click", () => {
+            if (formBox) formBox.style.display = formBox.style.display === "none" ? "block" : "none";
+          });
+          body.querySelector("#btn-cancel-link")?.addEventListener("click", () => {
+            if (formBox) formBox.style.display = "none";
+          });
+
+          const form = body.querySelector("#form-tautan-new");
+          if (form && services) {
+            form.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const saveBtn = body.querySelector("#btn-save-link");
+              saveBtn.disabled = true;
+              try {
+                await services.createLink({
+                  judul: body.querySelector("#lt-judul").value.trim(),
+                  url: body.querySelector("#lt-url").value.trim(),
+                  kategori: body.querySelector("#lt-cat").value,
+                  keterangan: body.querySelector("#lt-desc").value.trim()
+                });
+                rerender(filterCat);
+              } catch (err) {
+                alert("Gagal menyimpan tautan: " + err.message);
+                saveBtn.disabled = false;
+              }
+            });
+          }
+
+          const countEl = body.querySelector("#count-tautan");
+          const listEl = body.querySelector("#tautan-list");
+
+          const renderItems = (items) => {
+            const filtered = items.filter((t) => filterCat === "Semua" || (t.kategori || "Lainnya").toLowerCase() === filterCat.toLowerCase());
+            countEl.textContent = `${filtered.length} tautan ${filterCat !== 'Semua' ? `kategori ${filterCat}` : 'tersedia'}`;
+            if (!filtered.length) {
+              listEl.innerHTML = `<li style="grid-column:1/-1;justify-content:center;padding:2rem;">Belum ada tautan untuk kategori "${esc(filterCat)}".</li>`;
+              return;
+            }
+            listEl.innerHTML = filtered.map((t, i) => {
+              const a = tautan(t.url, t.judul);
+              return `<li style="--i:${i}">
+                <span class="time">${esc(t.kategori || "Umum")}</span>
+                <div>
+                  <h3>${a}</h3>
+                  <p>${esc(t.keterangan || "")}</p>
+                  ${canManage ? `
+                    <div class="task-action-btns">
+                      <button type="button" class="task-action-btn btn-del-link" data-id="${esc(t.$id)}" style="color:#ff8591;">Hapus</button>
+                    </div>
+                  ` : ""}
+                </div>
+              </li>`;
+            }).join("");
+
+            listEl.querySelectorAll(".btn-del-link").forEach((b) => b.addEventListener("click", async () => {
+              if (confirm("Hapus tautan ini?")) {
+                try {
+                  await services.deleteLink(b.dataset.id);
+                  rerender(filterCat);
+                } catch (e) { alert(e.message); }
+              }
+            }));
+          };
+
+          if (services && services.listLinks) {
+            services.listLinks().then(renderItems).catch(() => renderItems([]));
+          } else {
+            renderItems([]);
+          }
+        }
+      };
     },
 
     kas(subtab = "mutasi", rerender) {
@@ -459,6 +1219,45 @@ function makePanels(data, now = new Date()) {
             </button>
           </form>
         </div>
+
+        ${role === "admin" ? `
+          <!-- Bagian 3: Panel Admin (Kelola Role, Jabatan & PJ Matkul) -->
+          <div class="auth-card" id="admin-role-panel">
+            <h4 class="profile-section-title" style="color:#ff8591;">Panel Admin: Kelola Role &amp; PJ Matkul</h4>
+            <p>Tetapkan hak akses (Admin / Pengurus / Mahasiswa), jabatan kelas, dan penugasan Penanggung Jawab Mata Kuliah.</p>
+            <div class="auth-success" id="adm-success">Data anggota berhasil diperbarui!</div>
+            <div class="auth-error" id="adm-error"></div>
+            <form id="form-admin-role" class="auth-form">
+              <div class="auth-field">
+                <label for="adm-member">Pilih Mahasiswa (24 Anggota)</label>
+                <select class="auth-input" id="adm-member" required>
+                  <option value="">Memuat daftar mahasiswa...</option>
+                </select>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.75rem;">
+                <div class="auth-field">
+                  <label for="adm-role">Role Akses</label>
+                  <select class="auth-input" id="adm-role">
+                    <option value="mahasiswa">Mahasiswa</option>
+                    <option value="pengurus">Pengurus</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div class="auth-field">
+                  <label for="adm-jabatan">Jabatan Kelas</label>
+                  <input class="auth-input" id="adm-jabatan" type="text" placeholder="contoh: Bendahara / PJ Matkul">
+                </div>
+              </div>
+              <div class="auth-field">
+                <label for="adm-matkul-pj">Matkul PJ (Pisahkan dengan koma, atau "all")</label>
+                <input class="auth-input" id="adm-matkul-pj" type="text" placeholder="contoh: Matematika 1, Statistika Dasar">
+              </div>
+              <button type="submit" class="kas-btn kas-btn-primary" id="btn-save-adm" style="margin-top:.4rem; justify-self:start;">
+                <span>Simpan Role &amp; Penugasan</span>
+              </button>
+            </form>
+          </div>
+        ` : ""}
       `;
 
       return {
@@ -548,6 +1347,68 @@ function makePanels(data, now = new Date()) {
                 pwError.classList.add("show");
                 btnPw.disabled = false;
                 btnPw.querySelector("span").textContent = "Perbarui Kata Sandi";
+              }
+            });
+          }
+
+          // Panel Admin: Kelola Role & PJ Matkul
+          const services = window.SDT && window.SDT.services;
+          const admForm = body.querySelector("#form-admin-role");
+          if (admForm && services && role === "admin") {
+            const selMember = body.querySelector("#adm-member");
+            const inpRole = body.querySelector("#adm-role");
+            const inpJab = body.querySelector("#adm-jabatan");
+            const inpPj = body.querySelector("#adm-matkul-pj");
+            const admSucc = body.querySelector("#adm-success");
+            const admErr = body.querySelector("#adm-error");
+            const btnAdm = body.querySelector("#btn-save-adm");
+            let memberProfiles = [];
+
+            const fillFields = (id) => {
+              const target = memberProfiles.find((m) => m.$id === id);
+              if (!target) return;
+              inpRole.value = target.role || "mahasiswa";
+              inpJab.value = target.jabatan || "Mahasiswa";
+              inpPj.value = Array.isArray(target.matkul_pj) ? target.matkul_pj.join(", ") : "";
+            };
+
+            services.listProfiles().then((list) => {
+              memberProfiles = list || [];
+              selMember.innerHTML = memberProfiles.map((m) => `<option value="${esc(m.$id)}">${esc(m.nim)} - ${esc(m.nama_lengkap)} (${esc(m.role)})</option>`).join("");
+              if (memberProfiles.length) fillFields(memberProfiles[0].$id);
+            }).catch(() => {});
+
+            selMember.addEventListener("change", () => fillFields(selMember.value));
+
+            admForm.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              admSucc.classList.remove("show");
+              admErr.classList.remove("show");
+              const docId = selMember.value;
+              if (!docId) return;
+              btnAdm.disabled = true;
+              btnAdm.querySelector("span").textContent = "Menyimpan...";
+              try {
+                const pjArr = inpPj.value.split(",").map((s) => s.trim()).filter(Boolean);
+                await services.updateProfile(docId, {
+                  role: inpRole.value,
+                  jabatan: inpJab.value.trim() || "Mahasiswa",
+                  matkul_pj: pjArr
+                });
+                const updated = memberProfiles.find((m) => m.$id === docId);
+                if (updated) {
+                  updated.role = inpRole.value;
+                  updated.jabatan = inpJab.value.trim() || "Mahasiswa";
+                  updated.matkul_pj = pjArr;
+                }
+                services.logActivity("akun", "update_role", `${docId} -> ${inpRole.value} (${inpJab.value})`);
+                admSucc.classList.add("show");
+              } catch (err) {
+                admErr.textContent = err.message || "Gagal memperbarui role anggota.";
+                admErr.classList.add("show");
+              } finally {
+                btnAdm.disabled = false;
+                btnAdm.querySelector("span").textContent = "Simpan Role & Penugasan";
               }
             });
           }

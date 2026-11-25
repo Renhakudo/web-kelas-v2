@@ -556,11 +556,51 @@ function openWeek(n, from, force) {
     <hr class="np-hr">
     <div class="np-content">${k ? render(k.isi) : `<p class="np-empty">Belum ada rangkuman untuk minggu ini. ${canEdit ? "Tekan <b>Sunting</b> untuk menulisnya." : "Tambahkan di <code>data/rangkuman.js</code>."}</p>`}</div>
     ${metaLine(k)}
+    <div id="np-revisions-box" class="np-revisions-box" hidden style="margin:1rem 0;padding:.9rem 1rem;background:rgba(6,18,79,.65);border:1px solid var(--edge);"></div>
     <div class="np-pager">
       <button type="button" data-go="${pv || ""}" ${pv ? "" : "disabled"}><small>Sebelumnya${pv && EXAM[n - 1] ? " · sebelum " + EXAM[n - 1] : ""}</small>&lt; ${pv ? "Minggu " + pv : "Awal semester"}</button>
       <button type="button" data-go="${nx || ""}" ${nx ? "" : "disabled"}><small>Berikutnya${nx && EXAM[n + 1] ? " · setelah " + EXAM[n + 1] : ""}</small>${nx ? "Minggu " + nx : "Akhir semester"} &gt;</button>
     </div>`;
   $("#np-body").querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.go)));
+  const revBtn = $("#np-rev-btn");
+  const revBox = $("#np-revisions-box");
+  if (revBtn && revBox && k && k.id && window.SDT && window.SDT.services) {
+    revBtn.addEventListener("click", async () => {
+      if (!revBox.hidden) { revBox.hidden = true; return; }
+      revBox.hidden = false;
+      revBox.innerHTML = `<p style="margin:0;font-size:.82rem;color:var(--text-dim);">Memuat riwayat revisi...</p>`;
+      const revs = await window.SDT.services.listSummaryRevisions(k.id);
+      if (!revs.length) {
+        revBox.innerHTML = `<p style="margin:0;font-size:.82rem;color:var(--text-dim);">Belum ada catatan revisi untuk minggu ini.</p>`;
+        return;
+      }
+      const isLogged = window.SDT.auth && window.SDT.auth.state && window.SDT.auth.state.isLoggedIn;
+      revBox.innerHTML = `<p style="margin:0 0 .6rem;font:700 .78rem var(--mono);text-transform:uppercase;color:var(--aqua);">Riwayat Revisi (${revs.length})</p>`
+        + revs.map((r, idx) => `
+          <div style="padding:.55rem 0;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;">
+            <div>
+              <b style="font-size:.82rem;color:var(--paper);">${esc(r.edited_by_nama || "Mahasiswa")}</b>
+              <span style="display:block;font-size:.72rem;color:var(--text-dim);">${r.$createdAt ? esc(fmtStamp.format(new Date(r.$createdAt))) : ""} &middot; ${esc(r.catatan_perubahan || "Suntingan")}</span>
+            </div>
+            ${isLogged && r.isi_snapshot ? `<button type="button" class="ed-ghost btn-restore-rev" data-idx="${idx}" style="font-size:.72rem;padding:.28rem .55rem;">Pulihkan</button>` : ""}
+          </div>
+        `).join("");
+      revBox.querySelectorAll(".btn-restore-rev").forEach((b) => {
+        b.addEventListener("click", async () => {
+          const rev = revs[Number(b.dataset.idx)];
+          if (!rev || !confirm(`Pulihkan rangkuman ke versi yang disunting oleh ${rev.edited_by_nama || "Mahasiswa"}?`)) return;
+          try {
+            const newVersi = await cloud.simpan(docId(course, n), { judul: k.judul, penulis: k.penulis || rev.edited_by_nama, isi: rev.isi_snapshot }, k.versi);
+            course.minggu[n] = { ...k, isi: rev.isi_snapshot, versi: newVersi };
+            openWeek(n, null, true);
+            bar("Versi rangkuman berhasil dipulihkan.");
+          } catch (err) {
+            bar(err.message || "Gagal memulihkan versi.");
+          }
+        });
+      });
+    });
+  }
   page.scrollTop = 0;
   pageWrap.classList.add("show");
   root.inert = true;                       // halaman bacaan bersifat modal
@@ -617,9 +657,10 @@ const fmtStamp = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "shor
 
 function metaLine(k) {
   const parts = [];
-  if (k && k.versi) parts.push("Terakhir diubah " + fmtStamp.format(new Date(k.versi)));
+  if (k && k.versi) parts.push("Terakhir diubah " + fmtStamp.format(new Date(k.versi)) + (k.penulis ? " oleh " + k.penulis : ""));
   if (cloudState === "gagal") parts.push("Versi terbaru tidak bisa dimuat; yang tampil salinan bawaan situs.");
-  return parts.length ? `<p class="np-meta">${esc(parts.join(" · "))}</p>` : "";
+  const revBtn = (k && k.id) ? ` <button type="button" id="np-rev-btn" class="ed-link" style="margin-left:.5rem;font-size:.75rem;color:var(--aqua);cursor:pointer;">📜 Riwayat Revisi</button>` : "";
+  return (parts.length || revBtn) ? `<p class="np-meta">${esc(parts.join(" · "))}${revBtn}</p>` : "";
 }
 
 // Bilah pesan di bawah bilah atas. buttons: [[label, fungsi, utama?], ...]
@@ -644,7 +685,7 @@ function bar(text, buttons) {
 function applyCloud(docs) {
   D.matkul.forEach((c) => LECT.forEach((n) => {
     const d = docs[docId(c, n)];
-    if (d) c.minggu[n] = { judul: d.judul, penulis: d.penulis, isi: d.isi, versi: d.versi };
+    if (d) c.minggu[n] = { id: d.id, judul: d.judul, penulis: d.penulis, isi: d.isi, versi: d.versi };
   }));
 }
 function loadCloud() {

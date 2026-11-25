@@ -146,6 +146,20 @@ function fromHash() {
   }
   // Tautan lama #kalender: kalender kini tab di panel Jadwal
   if (key === "kalender") { select(0, false); openPanel("jadwal"); show("jadwal", "kalender"); return; }
+  if (key === "anggota" || key.startsWith("anggota/")) {
+    const nim = key.split("/")[1] || null;
+    select(MENU.findIndex((m) => m.key === "anggota"), false);
+    openPanel("anggota");
+    if (nim) show("anggota", nim);
+    return;
+  }
+  if (key === "tugas" || key.startsWith("tugas/")) {
+    const tab = key.split("/")[1] || "aktif";
+    select(MENU.findIndex((m) => m.key === "tugas"), false);
+    openPanel("tugas");
+    if (tab) show("tugas", tab);
+    return;
+  }
   if (key === "kas" || key.startsWith("kas/")) {
     const sub = key.split("/")[1] || "mutasi";
     select(MENU.findIndex((m) => m.key === "kas"), false);

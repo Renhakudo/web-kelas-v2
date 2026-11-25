@@ -12,7 +12,7 @@
     }
   };
 
-  const STORAGE_KEY = "sdta_kas_state_v1";
+  const STORAGE_KEY = "sdta_kas_state_v2";
 
   // Memuat state tersimpan atau inisialisasi dari data default
   function getState(kasData, anggotaData) {
@@ -28,27 +28,38 @@
     const baseKas = (kasData && kasData.data) || {};
 
     if (!saved) {
-      // Inisialisasi awal
+      // Inisialisasi awal model bulanan (Rp15.000 / bulan mulai Sep 2026)
       const iuranInit = Object.assign({}, baseKas.iuranMahasiswa || {});
-      // Pastikan semua mahasiswa terdaftar
       mhsList.forEach((nama) => {
         if (iuranInit[nama] === undefined) {
-          iuranInit[nama] = baseKas.targetMinggu || 8;
+          iuranInit[nama] = 3;
+        } else if (iuranInit[nama] > 12) {
+          iuranInit[nama] = 3;
         }
       });
 
       saved = {
-        nominalMingguan: baseKas.nominalMingguan || 5000,
-        targetMinggu: baseKas.targetMinggu || 8,
+        nominalBulanan: 15000,
+        mulaiPeriode: "2026-09",
+        targetBulan: 3,
+        skipBulan: [
+          { periode: "2026-12", alasan: "Libur Semester Ganjil" },
+          { periode: "2027-01", alasan: "Libur Semester Ganjil" }
+        ],
         transaksi: (baseKas.transaksi || []).slice(),
         iuranMahasiswa: iuranInit
       };
     } else {
-      // Pastikan mahasiswa baru tetap ada di iuranMahasiswa
+      saved.nominalBulanan = saved.nominalBulanan || 15000;
+      saved.targetBulan = saved.targetBulan || 3;
+      saved.skipBulan = saved.skipBulan || [
+        { periode: "2026-12", alasan: "Libur Semester Ganjil" },
+        { periode: "2027-01", alasan: "Libur Semester Ganjil" }
+      ];
       saved.iuranMahasiswa = saved.iuranMahasiswa || {};
       mhsList.forEach((nama) => {
         if (saved.iuranMahasiswa[nama] === undefined) {
-          saved.iuranMahasiswa[nama] = saved.targetMinggu || 8;
+          saved.iuranMahasiswa[nama] = saved.targetBulan || 3;
         }
       });
     }
@@ -126,13 +137,14 @@
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
     const saldo = totalMasuk - totalKeluar;
     const persenLunas = totalMhs ? Math.round((totalLunas / totalMhs) * 100) : 100;
+    const nominalBln = state.nominalBulanan || 15000;
 
     return `
       <div class="kas-summary" aria-label="Ringkasan Kas">
         <div class="kas-card main">
           <span class="kas-card-label">Saldo Kas Saat Ini</span>
           <div class="kas-card-val">${rupiah(saldo)}</div>
-          <p class="kas-card-sub">Iuran ${rupiah(state.nominalMingguan)} / mhs</p>
+          <p class="kas-card-sub">Iuran ${rupiah(nominalBln)} / bulan (Mulai Sep 2026)</p>
         </div>
         <div class="kas-card in">
           <span class="kas-card-label">Total Pemasukan</span>
@@ -178,7 +190,7 @@
   }
 
   // ================= TAB 1: MUTASI TRANSAKSI =================
-  function renderTabMutasi(state) {
+  function renderTabMutasi(state, canManage = false) {
     const list = state.transaksi.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal));
 
     return `
@@ -188,67 +200,71 @@
           <button type="button" class="kas-chip" data-filter="masuk"><span>Pemasukan (+)</span></button>
           <button type="button" class="kas-chip" data-filter="keluar"><span>Pengeluaran (-)</span></button>
         </div>
-        <div class="kas-actions">
-          <button type="button" class="kas-btn kas-btn-primary" id="btn-toggle-form">
-            <span>+ Catat Transaksi</span>
-          </button>
-        </div>
+        ${canManage ? `
+          <div class="kas-actions">
+            <button type="button" class="kas-btn kas-btn-primary" id="btn-toggle-form">
+              <span>+ Catat Transaksi</span>
+            </button>
+          </div>
+        ` : ""}
       </div>
 
       <!-- Form Catat Transaksi Baru (sembunyi bawaan) -->
-      <div class="kas-form-card" id="form-transaksi" style="display:none;" aria-hidden="true">
-        <div class="kas-form-head">
-          <h3>Catat Transaksi Kas Baru</h3>
-          <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-batal-form"><span>Tutup</span></button>
+      ${canManage ? `
+        <div class="kas-form-card" id="form-transaksi" style="display:none;" aria-hidden="true">
+          <div class="kas-form-head">
+            <h3>Catat Transaksi Kas Baru</h3>
+            <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-batal-form"><span>Tutup</span></button>
+          </div>
+          <div class="kas-form-grid">
+            <div class="kas-field">
+              <label for="trx-jenis">Jenis Transaksi</label>
+              <select class="kas-select" id="trx-jenis">
+                <option value="masuk">Pemasukan (+)</option>
+                <option value="keluar">Pengeluaran (-)</option>
+              </select>
+            </div>
+            <div class="kas-field">
+              <label for="trx-kategori">Kategori</label>
+              <select class="kas-select" id="trx-kategori">
+                <option value="Iuran Kas">Iuran Kas</option>
+                <option value="ATK & Kelas">ATK &amp; Kelas</option>
+                <option value="Fotokopi & Modul">Fotokopi &amp; Modul</option>
+                <option value="Konsumsi">Konsumsi</option>
+                <option value="Sosial & Apresiasi">Sosial &amp; Apresiasi</option>
+                <option value="Kegiatan Kelas">Kegiatan Kelas</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+            <div class="kas-field">
+              <label for="trx-nominal">Nominal (Rp)</label>
+              <input class="kas-input" id="trx-nominal" type="number" min="1000" step="1000" placeholder="contoh: 25000" required>
+            </div>
+            <div class="kas-field">
+              <label for="trx-tanggal">Tanggal</label>
+              <input class="kas-input" id="trx-tanggal" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
+            </div>
+            <div class="kas-field" style="grid-column: 1 / -1;">
+              <label for="trx-ket">Keterangan / Keperluan</label>
+              <input class="kas-input" id="trx-ket" type="text" placeholder="contoh: Beli 2 spidol snowman & penghapus" required>
+            </div>
+          </div>
+          <div class="kas-form-foot">
+            <button type="button" class="kas-btn kas-btn-primary" id="btn-simpan-trx"><span>Simpan Transaksi</span></button>
+          </div>
         </div>
-        <div class="kas-form-grid">
-          <div class="kas-field">
-            <label for="trx-jenis">Jenis Transaksi</label>
-            <select class="kas-select" id="trx-jenis">
-              <option value="masuk">Pemasukan (+)</option>
-              <option value="keluar">Pengeluaran (-)</option>
-            </select>
-          </div>
-          <div class="kas-field">
-            <label for="trx-kategori">Kategori</label>
-            <select class="kas-select" id="trx-kategori">
-              <option value="Iuran Kas">Iuran Kas</option>
-              <option value="ATK & Kelas">ATK &amp; Kelas</option>
-              <option value="Fotokopi & Modul">Fotokopi &amp; Modul</option>
-              <option value="Konsumsi">Konsumsi</option>
-              <option value="Sosial & Apresiasi">Sosial &amp; Apresiasi</option>
-              <option value="Kegiatan Kelas">Kegiatan Kelas</option>
-              <option value="Lainnya">Lainnya</option>
-            </select>
-          </div>
-          <div class="kas-field">
-            <label for="trx-nominal">Nominal (Rp)</label>
-            <input class="kas-input" id="trx-nominal" type="number" min="1000" step="1000" placeholder="contoh: 25000" required>
-          </div>
-          <div class="kas-field">
-            <label for="trx-tanggal">Tanggal</label>
-            <input class="kas-input" id="trx-tanggal" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
-          </div>
-          <div class="kas-field" style="grid-column: 1 / -1;">
-            <label for="trx-ket">Keterangan / Keperluan</label>
-            <input class="kas-input" id="trx-ket" type="text" placeholder="contoh: Beli 2 spidol snowman & penghapus" required>
-          </div>
-        </div>
-        <div class="kas-form-foot">
-          <button type="button" class="kas-btn kas-btn-primary" id="btn-simpan-trx"><span>Simpan Transaksi</span></button>
-        </div>
-      </div>
+      ` : ""}
 
       <input class="search" id="cari-trx" type="search" placeholder="Cari keterangan atau kategori transaksi\u2026" autocomplete="off" spellcheck="false">
       <p class="count" id="count-trx" aria-live="polite">${list.length} transaksi tercatat</p>
 
       <ul class="kas-trx-list" id="trx-items">
-        ${renderTrxItems(list)}
+        ${renderTrxItems(list, canManage)}
       </ul>
     `;
   }
 
-  function renderTrxItems(list) {
+  function renderTrxItems(list, canManage = false) {
     if (!list.length) {
       return `<li style="padding: 2rem; text-align: center; color: var(--text-dim);">Tidak ada transaksi yang cocok.</li>`;
     }
@@ -267,36 +283,79 @@
           <div class="kas-trx-amount ${isMasuk ? 'in' : 'out'}">
             ${isMasuk ? '+' : '-'}${rupiah(t.nominal)}
           </div>
-          <button type="button" class="kas-btn-del" data-del="${esc(t.id)}" title="Hapus transaksi" aria-label="Hapus transaksi ${esc(t.keterangan)}">Hapus</button>
+          ${canManage ? `<button type="button" class="kas-btn-del" data-del="${esc(t.id)}" title="Hapus transaksi" aria-label="Hapus transaksi ${esc(t.keterangan)}">Hapus</button>` : ""}
         </li>
       `;
     }).join("");
   }
 
   // ================= TAB 2: IURAN MAHASISWA =================
-  function renderTabIuran(state, mhsList) {
-    const target = state.targetMinggu || 8;
-    const nominal = state.nominalMingguan || 5000;
+  function renderTabIuran(state, mhsList, canManage = false) {
+    const target = state.targetBulan || 3;
+    const nominal = state.nominalBulanan || 15000;
     const targetRp = target * nominal;
+    const skipList = state.skipBulan || [];
 
     return `
-      <!-- Bar Kontrol Target Minggu -->
+      <!-- Bar Kontrol Target Bulan & Skip -->
       <div class="kas-target-bar">
         <div class="kas-target-info">
-          <h3>Target Tagihan: Minggu ke-${target}</h3>
-          <p>Kewajiban kas per mahasiswa saat ini: <b>${rupiah(targetRp)}</b> (${target} mgg \u00d7 ${rupiah(nominal)})</p>
+          <h3>Target Tagihan: ${target} Bulan Aktif (Sep 2026 - Nov 2026)</h3>
+          <p>Kewajiban kas per mahasiswa: <b>${rupiah(targetRp)}</b> (${target} bulan \u00d7 ${rupiah(nominal)}/bln)</p>
+          ${skipList.length ? `
+            <div style="margin-top:.4rem;display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;">
+              <small style="font:700 .65rem var(--mono);color:var(--text-dim);text-transform:uppercase;">Bulan Libur (Skip):</small>
+              ${skipList.map((s) => `<span class="kas-badge out" style="font-size:.62rem;">${esc(s.periode)} (${esc(s.alasan)})</span>`).join("")}
+            </div>
+          ` : ""}
         </div>
         <div class="kas-actions">
-          <div class="kas-target-stepper" title="Ubah target minggu kas">
-            <button type="button" class="kas-stepper-btn" id="btn-target-dec" aria-label="Kurangi target minggu">&minus;</button>
-            <span class="kas-stepper-val" id="val-target-minggu">M${target}</span>
-            <button type="button" class="kas-stepper-btn" id="btn-target-inc" aria-label="Tambah target minggu">+</button>
-          </div>
+          ${canManage ? `
+            <div class="kas-target-stepper" title="Ubah target bulan kas">
+              <button type="button" class="kas-stepper-btn" id="btn-target-dec" aria-label="Kurangi target bulan">&minus;</button>
+              <span class="kas-stepper-val" id="val-target-minggu">${target} Bln</span>
+              <button type="button" class="kas-stepper-btn" id="btn-target-inc" aria-label="Tambah target bulan">+</button>
+            </div>
+            <button type="button" class="kas-btn kas-btn-outline" id="btn-toggle-skip-modal">
+              <span>🏖️ Atur Skip Bulan</span>
+            </button>
+          ` : ""}
           <button type="button" class="kas-btn kas-btn-wa" id="btn-salin-wa">
             <span>&#128203; Salin Tagihan WhatsApp</span>
           </button>
         </div>
       </div>
+
+      ${canManage ? `
+        <div class="kas-form-card" id="form-skip-box" style="display:none;margin-bottom:1.25rem;" aria-hidden="true">
+          <div class="kas-form-head">
+            <h3>Pengaturan Bulan Libur / Skip Iuran</h3>
+            <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-tutup-skip"><span>Tutup</span></button>
+          </div>
+          <p style="font:500 .8rem var(--sans);color:var(--text-dim);margin:0 0 1rem;">Bulan yang dilewati (misal libur semester) tidak menambah tagihan atau dianggap menunggak.</p>
+          <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:.5rem;align-items:end;margin-bottom:.85rem;">
+            <div class="kas-field">
+              <label for="sk-periode">Periode (YYYY-MM)</label>
+              <input type="text" id="sk-periode" class="kas-input" placeholder="contoh: 2026-12">
+            </div>
+            <div class="kas-field">
+              <label for="sk-alasan">Keterangan / Alasan</label>
+              <input type="text" id="sk-alasan" class="kas-input" placeholder="contoh: Libur Semester Ganjil">
+            </div>
+            <button type="button" class="kas-btn kas-btn-primary" id="btn-tambah-skip" style="height:2.4rem;">
+              <span>+ Tambah Skip</span>
+            </button>
+          </div>
+          <div id="skip-items-list" style="display:flex;flex-wrap:wrap;gap:.4rem;">
+            ${skipList.map((s, idx) => `
+              <span class="kas-badge out" style="display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .6rem;">
+                <b>${esc(s.periode)}</b>: ${esc(s.alasan)}
+                <button type="button" class="btn-del-skip" data-idx="${idx}" data-id="${esc(s.$id || '')}" style="background:none;border:none;color:#ff8591;cursor:pointer;font-weight:900;" aria-label="Hapus skip ${esc(s.periode)}">&times;</button>
+              </span>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
 
       <div class="kas-toolbar">
         <div class="kas-chips" role="group" aria-label="Filter status iuran">
@@ -310,15 +369,14 @@
       <p class="count" id="count-iuran" aria-live="polite"></p>
 
       <div class="kas-iuran-grid" id="iuran-grid">
-        ${renderIuranCards(state, mhsList)}
+        ${renderIuranCards(state, mhsList, "semua", "", canManage)}
       </div>
     `;
   }
 
-  function renderIuranCards(state, mhsList, filter = "semua", query = "") {
-    const target = state.targetMinggu || 8;
-    const nominal = state.nominalMingguan || 5000;
-    const targetRp = target * nominal;
+  function renderIuranCards(state, mhsList, filter = "semua", query = "", canManage = false) {
+    const target = state.targetBulan || 3;
+    const nominal = state.nominalBulanan || 15000;
 
     const filtered = mhsList.filter((nama) => {
       const bayar = state.iuranMahasiswa[nama] || 0;
@@ -337,8 +395,8 @@
       const bayar = state.iuranMahasiswa[nama] || 0;
       const terbayarRp = bayar * nominal;
       const isLunas = bayar >= target;
-      const kurangMinggu = Math.max(0, target - bayar);
-      const kurangRp = kurangMinggu * nominal;
+      const kurangBulan = Math.max(0, target - bayar);
+      const kurangRp = kurangBulan * nominal;
       const persen = Math.min(100, Math.round((bayar / (target || 1)) * 100));
 
       return `
@@ -353,7 +411,7 @@
 
           <div class="kas-mhs-progress">
             <div class="kas-progress-labels">
-              <span>Mgg <b>${bayar}</b> dari ${target}</span>
+              <span>Bulan ke-<b>${bayar}</b> dari ${target}</span>
               <span>${rupiah(terbayarRp)} (${persen}%)</span>
             </div>
             <div class="kas-bar-bg" role="progressbar" aria-valuenow="${persen}" aria-valuemin="0" aria-valuemax="100">
@@ -361,19 +419,17 @@
             </div>
           </div>
 
-          <div class="kas-mhs-controls">
-            <span style="font: 500 .68rem var(--mono); color: var(--text-dim);">Ubah status:</span>
-            <div class="kas-mhs-btns">
-              <button type="button" class="kas-btn-micro" data-act="dec" data-nama="${esc(nama)}" aria-label="Kurangi 1 minggu bayar ${esc(nama)}">-1 Mgg</button>
-              <button type="button" class="kas-btn-micro" data-act="inc" data-nama="${esc(nama)}" aria-label="Tambah 1 minggu bayar ${esc(nama)}">+1 Mgg</button>
-              <button type="button" class="kas-btn-micro" data-act="lunas" data-nama="${esc(nama)}" aria-label="Tandai lunas sampai target ${esc(nama)}" style="background:var(--aqua);color:var(--ink);border-color:var(--aqua);">Lunas</button>
+          ${canManage ? `
+            <div class="kas-mhs-controls">
+              <button type="button" class="kas-btn-micro" data-act="dec" data-nama="${esc(nama)}" title="Kurangi 1 bulan bayar">&minus;1</button>
+              <button type="button" class="kas-btn-micro" data-act="inc" data-nama="${esc(nama)}" title="Tambah 1 bulan bayar">+1</button>
+              <button type="button" class="kas-btn-micro lunas-btn" data-act="lunas" data-nama="${esc(nama)}" title="Tandai langsung lunas">Lunas</button>
             </div>
-          </div>
+          ` : ""}
         </div>
       `;
     }).join("");
   }
-
   // ================= TAB 3: CARA BAYAR & REKENING =================
   function renderTabRekening(kasData) {
     const rekList = (kasData && kasData.data && kasData.data.rekening) || [
@@ -473,8 +529,8 @@
 
   // ================= TAB 4: LAPORAN & STATISTIK =================
   function renderTabLaporan(state, mhsList) {
-    const target = state.targetMinggu || 8;
-    const nominal = state.nominalMingguan || 5000;
+    const target = state.targetBulan || 3;
+    const nominal = state.nominalBulanan || 15000;
     const targetPerMhs = target * nominal;
     const totalTargetKelas = mhsList.length * targetPerMhs;
 
@@ -549,7 +605,7 @@
                 <td style="color:var(--aqua); font-size:1.05rem;">${rupiah(saldo)}</td>
               </tr>
               <tr>
-                <td>Target Kas Terkumpul (M1-M${target})</td>
+                <td>Target Kas Terkumpul (Bln 1 - Bln ${target})</td>
                 <td>${rupiah(totalTargetKelas)}</td>
               </tr>
               <tr>
@@ -585,8 +641,8 @@
 
   // ================= GENERATOR FORMAT WHATSAPP =================
   function generateWaRecap(state, mhsList) {
-    const target = state.targetMinggu || 8;
-    const nominal = state.nominalMingguan || 5000;
+    const target = state.targetBulan || 3;
+    const nominal = state.nominalBulanan || 15000;
     const targetRp = target * nominal;
 
     const totalMasuk = state.transaksi
@@ -616,16 +672,16 @@
     });
 
     let text = `📢 *REKAP KAS KELAS SAINS DATA TERAPAN A*\n`;
-    text += `🗓️ Target: *Minggu ke-${target}* (${rupiah(targetRp)} / orang)\n`;
+    text += `🗓️ Target: *Bulan ke-${target} (Mulai Sep 2026)* (${rupiah(targetRp)} / orang)\n`;
     text += `💰 Saldo Kas Saat Ini: *${rupiah(saldo)}*\n`;
     text += `✅ Mahasiswa Lunas: *${lunasCount} dari ${mhsList.length} orang*\n\n`;
 
     if (tunggakanList.length === 0) {
-      text += `🎉 *Luar biasa! Seluruh mahasiswa sudah lunas sampai Minggu ke-${target}!* 🥳\n\n`;
+      text += `🎉 *Luar biasa! Seluruh mahasiswa sudah lunas sampai Bulan ke-${target}!* 🥳\n\n`;
     } else {
       text += `⚠️ *DAFTAR MAHASISWA MENUNGGAK (${tunggakanList.length} orang):*\n`;
       tunggakanList.forEach((m, idx) => {
-        text += `${idx + 1}. *${m.nama}* (Kurang ${m.kurang} mgg \u2192 *${rupiah(m.kurangRp)}*)\n`;
+        text += `${idx + 1}. *${m.nama}* (Kurang ${m.kurang} bln \u2192 *${rupiah(m.kurangRp)}*)\n`;
       });
       text += `\n`;
     }
@@ -634,15 +690,15 @@
     text += `\u2022 BCA: *8290381928* (a.n Rihana Shafira Azzalia)\n`;
     text += `\u2022 Mandiri: *1420019283741* (a.n Fauzan Aqeelah Ghazi Rabbani)\n`;
     text += `\u2022 DANA/GoPay: *081234567890* (a.n Rihana Shafira Azzalia)\n\n`;
-    text += `📌 *Catatan:* Cantumkan berita \`KAS_[NAMA]_[MINGGU]\` dan kirimkan bukti transfer ke WhatsApp Bendahara ya. Terima kasih banyak atas kerjasamanya! 🙏✨`;
+    text += `📌 *Catatan:* Cantumkan berita \`KAS_[NAMA]_[BULAN]\` dan kirimkan bukti transfer ke WhatsApp Bendahara ya. Terima kasih banyak atas kerjasamanya! 🙏✨`;
 
     return text;
   }
 
   // ================= GENERATOR CSV =================
   function generateCsv(state, mhsList) {
-    const target = state.targetMinggu || 8;
-    const nominal = state.nominalMingguan || 5000;
+    const target = state.targetBulan || 3;
+    const nominal = state.nominalBulanan || 15000;
 
     let csv = "LAPORAN KAS SAINS DATA TERAPAN A\r\n";
     csv += `Tanggal Unduh,${new Date().toISOString().slice(0, 10)}\r\n\r\n`;
@@ -655,12 +711,12 @@
     });
 
     csv += "\r\nBAGIAN 2: STATUS IURAN MAHASISWA\r\n";
-    csv += `Nama Mahasiswa,Minggu Terbayar,Target Minggu,Nominal Terbayar,Sisa Tunggakan,Status\r\n`;
+    csv += `Nama Mahasiswa,Bulan Terbayar,Target Bulan,Nominal Terbayar,Sisa Tunggakan,Status\r\n`;
     mhsList.forEach((nama) => {
       const bayar = state.iuranMahasiswa[nama] || 0;
       const terbayarRp = bayar * nominal;
-      const sisaMinggu = Math.max(0, target - bayar);
-      const sisaRp = sisaMinggu * nominal;
+      const sisaBulan = Math.max(0, target - bayar);
+      const sisaRp = sisaBulan * nominal;
       const status = bayar >= target ? "LUNAS" : "MENUNGGAK";
       csv += `"${nama.replace(/"/g, '""')}",${bayar},${target},${terbayarRp},${sisaRp},"${status}"\r\n`;
     });
@@ -676,20 +732,23 @@
 
     const mhsList = (data.anggota && data.anggota.data && data.anggota.data.mahasiswa) || [];
     const state = getState(data.kas, data.anggota);
+    const auth = window.SDT && window.SDT.auth;
+    const canManage = Boolean(auth && (auth.hasRole("admin") || (auth.canManageCash && auth.canManageCash())));
 
     // Hitung status lunas untuk ringkasan
     let totalLunas = 0;
+    const targetBln = state.targetBulan || 3;
     mhsList.forEach((n) => {
-      if ((state.iuranMahasiswa[n] || 0) >= (state.targetMinggu || 8)) totalLunas++;
+      if ((state.iuranMahasiswa[n] || 0) >= targetBln) totalLunas++;
     });
 
     const activeTab = ["mutasi", "iuran", "rekening", "laporan"].includes(subtab) ? subtab : "mutasi";
 
     let tabHtml = "";
     if (activeTab === "mutasi") {
-      tabHtml = renderTabMutasi(state);
+      tabHtml = renderTabMutasi(state, canManage);
     } else if (activeTab === "iuran") {
-      tabHtml = renderTabIuran(state, mhsList);
+      tabHtml = renderTabIuran(state, mhsList, canManage);
     } else if (activeTab === "rekening") {
       tabHtml = renderTabRekening(data.kas);
     } else if (activeTab === "laporan") {
@@ -708,6 +767,52 @@
       sub: "Pengelola kas dan iuran kelas",
       html,
       after(body) {
+        const services = window.SDT && window.SDT.services;
+
+        // Sinkronisasi latar belakang dari Appwrite (hanya sekali per sesi panel agar tidak loop)
+        if (services && !window.SDT._kasSynced) {
+          window.SDT._kasSynced = true;
+          Promise.all([
+            services.listCashTransactions(),
+            services.listCashMonthSettings(),
+            services.listCashPayments()
+          ]).then(([trxDocs, skipDocs, payDocs]) => {
+            let changed = false;
+            if (Array.isArray(trxDocs) && trxDocs.length > 0) {
+              state.transaksi = trxDocs.map((d) => ({
+                id: d.$id,
+                tanggal: d.tanggal,
+                jenis: d.jenis,
+                kategori: d.kategori,
+                nominal: d.nominal,
+                keterangan: d.keterangan
+              }));
+              changed = true;
+            }
+            if (Array.isArray(skipDocs) && skipDocs.length > 0) {
+              state.skipBulan = skipDocs.filter((s) => s.is_skipped !== false).map((s) => ({
+                $id: s.$id,
+                periode: s.periode_bulan,
+                alasan: s.alasan || "Libur Semester"
+              }));
+              changed = true;
+            }
+            if (Array.isArray(payDocs) && payDocs.length > 0) {
+              const nomBln = state.nominalBulanan || 15000;
+              payDocs.forEach((p) => {
+                if (p.user_id && p.periode_bulan === "TOTAL") {
+                  state.iuranMahasiswa[p.user_id] = Math.round(Number(p.nominal_dibayar || 0) / nomBln);
+                  changed = true;
+                }
+              });
+            }
+            if (changed) {
+              saveState(state);
+              rerender(activeTab);
+            }
+          }).catch(() => {});
+        }
+
         // Pasang event listener ganti tab
         const tabBtns = body.querySelectorAll(".kas-tabs .tab");
         tabBtns.forEach((btn, i) => {
@@ -754,7 +859,7 @@
           }
 
           if (btnSimpan) {
-            btnSimpan.addEventListener("click", () => {
+            btnSimpan.addEventListener("click", async () => {
               const jenis = body.querySelector("#trx-jenis").value;
               const kategori = body.querySelector("#trx-kategori").value;
               const nominal = Number(body.querySelector("#trx-nominal").value);
@@ -781,6 +886,23 @@
                 keterangan
               };
 
+              btnSimpan.disabled = true;
+              try {
+                if (services && services.createCashTransaction) {
+                  const created = await services.createCashTransaction({
+                    tanggal: newTrx.tanggal,
+                    jenis: newTrx.jenis,
+                    kategori: newTrx.kategori,
+                    nominal: newTrx.nominal,
+                    keterangan: newTrx.keterangan
+                  });
+                  if (created && created.$id) newTrx.id = created.$id;
+                  services.logActivity("kas", "create_transaction", `${jenis}: ${rupiah(nominal)} - ${keterangan}`);
+                }
+              } catch (err) {
+                showToast("Disimpan lokal (Appwrite: " + err.message + ")");
+              }
+
               state.transaksi.unshift(newTrx);
               saveState(state);
               showToast("Transaksi berhasil dicatat!");
@@ -797,7 +919,7 @@
               if (q && !t.keterangan.toLowerCase().includes(q) && !t.kategori.toLowerCase().includes(q)) return false;
               return true;
             });
-            if (trxItemsContainer) trxItemsContainer.innerHTML = renderTrxItems(filtered);
+            if (trxItemsContainer) trxItemsContainer.innerHTML = renderTrxItems(filtered, canManage);
             if (countTrx) countTrx.textContent = `${filtered.length} dari ${state.transaksi.length} transaksi`;
             pasangDeleteTrx();
           };
@@ -817,11 +939,19 @@
 
           const pasangDeleteTrx = () => {
             body.querySelectorAll(".kas-btn-del").forEach((btn) => {
-              btn.addEventListener("click", (e) => {
+              btn.addEventListener("click", async () => {
                 const id = btn.dataset.del;
                 const item = state.transaksi.find((x) => x.id === id);
                 if (!item) return;
                 if (confirm(`Hapus catatan transaksi: "${item.keterangan}" (${rupiah(item.nominal)})?`)) {
+                  try {
+                    if (services && services.deleteCashTransaction && !id.startsWith("trx-")) {
+                      await services.deleteCashTransaction(id);
+                      services.logActivity("kas", "delete_transaction", `${item.keterangan} (${rupiah(item.nominal)})`);
+                    }
+                  } catch (err) {
+                    console.warn("Gagal hapus di Appwrite:", err);
+                  }
                   state.transaksi = state.transaksi.filter((x) => x.id !== id);
                   saveState(state);
                   showToast("Transaksi telah dihapus.");
@@ -838,16 +968,75 @@
           const btnDec = body.querySelector("#btn-target-dec");
           const btnInc = body.querySelector("#btn-target-inc");
           const btnSalinWa = body.querySelector("#btn-salin-wa");
+          const btnToggleSkip = body.querySelector("#btn-toggle-skip-modal");
+          const btnTutupSkip = body.querySelector("#btn-tutup-skip");
+          const formSkipBox = body.querySelector("#form-skip-box");
+          const btnTambahSkip = body.querySelector("#btn-tambah-skip");
           const cariInput = body.querySelector("#cari-mhs-iuran");
           const chipBtns = body.querySelectorAll(".kas-chips .kas-chip");
           const grid = body.querySelector("#iuran-grid");
           const countIuran = body.querySelector("#count-iuran");
 
+          if (btnToggleSkip && formSkipBox) {
+            btnToggleSkip.addEventListener("click", () => {
+              const open = formSkipBox.style.display !== "none";
+              formSkipBox.style.display = open ? "none" : "block";
+              formSkipBox.setAttribute("aria-hidden", String(open));
+            });
+          }
+          if (btnTutupSkip && formSkipBox) {
+            btnTutupSkip.addEventListener("click", () => {
+              formSkipBox.style.display = "none";
+              formSkipBox.setAttribute("aria-hidden", "true");
+            });
+          }
+          if (btnTambahSkip) {
+            btnTambahSkip.addEventListener("click", async () => {
+              const periode = (body.querySelector("#sk-periode")?.value || "").trim();
+              const alasan = (body.querySelector("#sk-alasan")?.value || "").trim() || "Libur Semester";
+              if (!/^\d{4}-\d{2}$/.test(periode)) {
+                alert("Format periode harus YYYY-MM, contoh: 2026-12");
+                return;
+              }
+              const entry = { periode, alasan };
+              try {
+                if (services && services.createCashMonthSetting) {
+                  const doc = await services.createCashMonthSetting(periode, alasan);
+                  if (doc && doc.$id) entry.$id = doc.$id;
+                }
+              } catch (err) {
+                console.warn("Skip bulan sync:", err);
+              }
+              state.skipBulan = state.skipBulan || [];
+              if (!state.skipBulan.some((x) => x.periode === periode)) {
+                state.skipBulan.push(entry);
+              }
+              saveState(state);
+              showToast(`Bulan ${periode} ditandai sebagai libur (skip).`);
+              rerender("iuran");
+            });
+          }
+          body.querySelectorAll(".btn-del-skip").forEach((b) => {
+            b.addEventListener("click", async () => {
+              const idx = Number(b.dataset.idx);
+              const docId = b.dataset.id;
+              try {
+                if (services && services.deleteCashMonthSetting && docId) {
+                  await services.deleteCashMonthSetting(docId);
+                }
+              } catch {}
+              state.skipBulan.splice(idx, 1);
+              saveState(state);
+              showToast("Aturan skip bulan dihapus.");
+              rerender("iuran");
+            });
+          });
+
           let currentFilter = "semua";
 
           // Perbarui hitungan badge chip
           const updateCounts = () => {
-            const target = state.targetMinggu || 8;
+            const target = state.targetBulan || 3;
             let lunas = 0, nunggak = 0;
             mhsList.forEach((nama) => {
               const b = state.iuranMahasiswa[nama] || 0;
@@ -867,7 +1056,7 @@
           const applyIuranFilter = () => {
             const q = (cariInput?.value || "").trim();
             if (grid) {
-              grid.innerHTML = renderIuranCards(state, mhsList, currentFilter, q);
+              grid.innerHTML = renderIuranCards(state, mhsList, currentFilter, q, canManage);
               pasangMhsControls();
             }
             updateCounts();
@@ -886,11 +1075,11 @@
             cariInput.addEventListener("input", applyIuranFilter);
           }
 
-          // Stepper Target Minggu
+          // Stepper Target Bulan
           if (btnDec) {
             btnDec.addEventListener("click", () => {
-              if (state.targetMinggu > 1) {
-                state.targetMinggu -= 1;
+              if (state.targetBulan > 1) {
+                state.targetBulan -= 1;
                 saveState(state);
                 rerender("iuran");
               }
@@ -898,8 +1087,8 @@
           }
           if (btnInc) {
             btnInc.addEventListener("click", () => {
-              if (state.targetMinggu < 24) {
-                state.targetMinggu += 1;
+              if (state.targetBulan < 24) {
+                state.targetBulan += 1;
                 saveState(state);
                 rerender("iuran");
               }
@@ -920,7 +1109,7 @@
               btn.addEventListener("click", () => {
                 const act = btn.dataset.act;
                 const nama = btn.dataset.nama;
-                const target = state.targetMinggu || 8;
+                const target = state.targetBulan || 3;
                 let val = state.iuranMahasiswa[nama] || 0;
 
                 if (act === "inc") val += 1;
@@ -929,6 +1118,15 @@
 
                 state.iuranMahasiswa[nama] = val;
                 saveState(state);
+                if (services && services.upsertCashPayment) {
+                  const nomBln = state.nominalBulanan || 15000;
+                  services.upsertCashPayment(
+                    nama,
+                    "TOTAL",
+                    val * nomBln,
+                    val >= target ? "lunas" : "belum_bayar"
+                  ).catch(() => {});
+                }
                 applyIuranFilter();
                 // Perbarui juga summary bar di atas tanpa reload penuh
                 const summaryEl = body.querySelector(".kas-summary");

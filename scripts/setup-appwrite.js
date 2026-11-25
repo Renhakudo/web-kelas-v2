@@ -186,7 +186,38 @@ async function main() {
       { col: 'links', type: 'string', key: 'judul', size: 100, req: true },
       { col: 'links', type: 'string', key: 'url', size: 500, req: true },
       { col: 'links', type: 'string', key: 'kategori', size: 50, req: false, def: 'Akademik' },
-      { col: 'links', type: 'string', key: 'keterangan', size: 255, req: false }
+      { col: 'links', type: 'string', key: 'keterangan', size: 255, req: false },
+
+      // schedule_overrides
+      { col: 'schedule_overrides', type: 'string', key: 'subject_id', size: 120, req: true },
+      { col: 'schedule_overrides', type: 'string', key: 'tanggal_awal', size: 30, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'tanggal_pengganti', size: 30, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'mulai_pengganti', size: 15, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'selesai_pengganti', size: 15, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'ruang_pengganti', size: 150, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'tipe_perubahan', size: 30, req: false, def: 'pindah_jadwal' },
+      { col: 'schedule_overrides', type: 'string', key: 'keterangan', size: 500, req: false },
+      { col: 'schedule_overrides', type: 'string', key: 'status', size: 20, req: false, def: 'aktif' },
+      { col: 'schedule_overrides', type: 'string', key: 'created_by', size: 50, req: false },
+
+      // summary_revisions
+      { col: 'summary_revisions', type: 'string', key: 'summary_id', size: 60, req: true },
+      { col: 'summary_revisions', type: 'string', key: 'isi_snapshot', size: 50000, req: false },
+      { col: 'summary_revisions', type: 'string', key: 'edited_by', size: 60, req: false },
+      { col: 'summary_revisions', type: 'string', key: 'edited_by_nama', size: 100, req: false },
+      { col: 'summary_revisions', type: 'string', key: 'catatan_perubahan', size: 255, req: false },
+
+      // cash_month_settings
+      { col: 'cash_month_settings', type: 'string', key: 'periode_bulan', size: 20, req: true },
+      { col: 'cash_month_settings', type: 'boolean', key: 'is_skipped', req: false, def: true },
+      { col: 'cash_month_settings', type: 'string', key: 'alasan', size: 255, req: false },
+
+      // activity_logs
+      { col: 'activity_logs', type: 'string', key: 'user_id', size: 60, req: false },
+      { col: 'activity_logs', type: 'string', key: 'user_nama', size: 100, req: false },
+      { col: 'activity_logs', type: 'string', key: 'kategori', size: 30, req: false },
+      { col: 'activity_logs', type: 'string', key: 'aksi', size: 50, req: false },
+      { col: 'activity_logs', type: 'string', key: 'detail', size: 500, req: false }
     ];
 
     for (const attr of attributes) {
@@ -202,6 +233,8 @@ async function main() {
         if (attr.def !== undefined) payload.default = attr.def;
       } else if (attr.type === 'integer') {
         if (attr.min !== undefined) payload.min = attr.min;
+      } else if (attr.type === 'boolean') {
+        if (attr.def !== undefined) payload.default = Boolean(attr.def);
       }
 
       try {
