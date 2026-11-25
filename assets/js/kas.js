@@ -12,7 +12,7 @@
     }
   };
 
-  const STORAGE_KEY = "sdta_kas_state_v2";
+  const STORAGE_KEY = "sdta_kas_state_v3";
 
   // Memuat state tersimpan atau inisialisasi dari data default
   function getState(kasData, anggotaData) {
@@ -32,16 +32,14 @@
       const iuranInit = Object.assign({}, baseKas.iuranMahasiswa || {});
       mhsList.forEach((nama) => {
         if (iuranInit[nama] === undefined) {
-          iuranInit[nama] = 3;
-        } else if (iuranInit[nama] > 12) {
-          iuranInit[nama] = 3;
+          iuranInit[nama] = 0;
         }
       });
 
       saved = {
-        nominalBulanan: 15000,
-        mulaiPeriode: "2026-09",
-        targetBulan: 3,
+        nominalBulanan: baseKas.nominalBulanan || 15000,
+        mulaiPeriode: baseKas.mulaiPeriode || "2026-09",
+        targetBulan: baseKas.targetBulan || 3,
         skipBulan: [
           { periode: "2026-12", alasan: "Libur Semester Ganjil" },
           { periode: "2027-01", alasan: "Libur Semester Ganjil" }
@@ -59,7 +57,7 @@
       saved.iuranMahasiswa = saved.iuranMahasiswa || {};
       mhsList.forEach((nama) => {
         if (saved.iuranMahasiswa[nama] === undefined) {
-          saved.iuranMahasiswa[nama] = saved.targetBulan || 3;
+          saved.iuranMahasiswa[nama] = 0;
         }
       });
     }

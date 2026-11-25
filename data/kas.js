@@ -1,10 +1,10 @@
-// Data kas kelas Sains Data Terapan A.
-// Berisi nominal iuran mingguan, rekening pembayaran bendahara, transaksi awal, dan status iuran.
-// Ubah hanya bagian di dalam tanda = ... ; teks diapit tanda kutip ganda, antar-item dipisah koma.
+// Data kas real kelas Sains Data Terapan A (berdasarkan kas SDT A.xlsx).
+// Berisi nominal iuran bulanan, rekening pembayaran bendahara, transaksi real, dan status iuran.
 window.DATA = window.DATA || {};
 window.DATA.kas = {
-  "nominalMingguan": 5000,
-  "targetMinggu": 8,
+  "nominalBulanan": 15000,
+  "mulaiPeriode": "2026-09",
+  "targetBulan": 3,
   "rekening": [
     {
       "metode": "BCA",
@@ -25,121 +25,73 @@ window.DATA.kas = {
       "keterangan": "E-Wallet (Bebas biaya admin sesama app)"
     }
   ],
-  "catatanPembayaran": "Format berita transfer: KAS_[NAMA]_[MINGGU]. Kirim bukti transfer via WhatsApp ke Bendahara.",
+  "catatanPembayaran": "Format berita transfer: KAS_[NAMA]_[BULAN]. Kirim bukti transfer via WhatsApp ke Bendahara.",
   "transaksi": [
     {
-      "id": "trx-01",
-      "tanggal": "2026-08-28",
+      "id": "trx-real-01",
+      "tanggal": "2026-09-15",
       "jenis": "masuk",
       "kategori": "Iuran Kas",
-      "nominal": 120000,
-      "keterangan": "Iuran Kas Minggu 1 (24 mahasiswa)"
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Alina Yusika Safitri (Sep 2026)"
     },
     {
-      "id": "trx-02",
-      "tanggal": "2026-09-02",
+      "id": "trx-real-02",
+      "tanggal": "2026-09-15",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Rihana Shafira Azzalia (Sep 2026)"
+    },
+    {
+      "id": "trx-real-03",
+      "tanggal": "2026-09-20",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 60000,
+      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Sep–Des 2026, 4 bulan)"
+    },
+    {
+      "id": "trx-real-04",
+      "tanggal": "2026-09-25",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 45000,
+      "keterangan": "Iuran Kas - Muhammad Hilmi Mu'Afa (Sep–Nov 2026, 3 bulan)"
+    },
+    {
+      "id": "trx-real-05",
+      "tanggal": "2026-10-02",
       "jenis": "keluar",
       "kategori": "ATK & Kelas",
-      "nominal": 35000,
-      "keterangan": "Beli spidol whiteboard Snowman (3 pcs) & penghapus"
-    },
-    {
-      "id": "trx-03",
-      "tanggal": "2026-09-05",
-      "jenis": "masuk",
-      "kategori": "Iuran Kas",
-      "nominal": 120000,
-      "keterangan": "Iuran Kas Minggu 2 (24 mahasiswa)"
-    },
-    {
-      "id": "trx-04",
-      "tanggal": "2026-09-12",
-      "jenis": "masuk",
-      "kategori": "Iuran Kas",
-      "nominal": 115000,
-      "keterangan": "Iuran Kas Minggu 3 (23 mahasiswa)"
-    },
-    {
-      "id": "trx-05",
-      "tanggal": "2026-09-18",
-      "jenis": "keluar",
-      "kategori": "Fotokopi & Modul",
-      "nominal": 48000,
-      "keterangan": "Cetak modul praktikum Statistika Dasar & lembar kerja"
-    },
-    {
-      "id": "trx-06",
-      "tanggal": "2026-09-26",
-      "jenis": "masuk",
-      "kategori": "Iuran Kas",
-      "nominal": 110000,
-      "keterangan": "Iuran Kas Minggu 4 & susulan mgg 3"
-    },
-    {
-      "id": "trx-07",
-      "tanggal": "2026-10-08",
-      "jenis": "keluar",
-      "kategori": "Konsumsi",
-      "nominal": 65000,
-      "keterangan": "Snack & air mineral rapat evaluasi tengah semester"
-    },
-    {
-      "id": "trx-08",
-      "tanggal": "2026-10-15",
-      "jenis": "keluar",
-      "kategori": "Sosial & Apresiasi",
-      "nominal": 50000,
-      "keterangan": "Buket bunga & ucapan apresiasi dosen pembina kelas"
-    },
-    {
-      "id": "trx-09",
-      "tanggal": "2026-10-25",
-      "jenis": "masuk",
-      "kategori": "Iuran Kas",
-      "nominal": 120000,
-      "keterangan": "Iuran Kas Minggu 5-6 gabungan"
-    },
-    {
-      "id": "trx-10",
-      "tanggal": "2026-11-05",
-      "jenis": "keluar",
-      "kategori": "ATK & Kelas",
-      "nominal": 25000,
-      "keterangan": "Isi ulang tinta spidol & lakban perlengkapan kelas"
-    },
-    {
-      "id": "trx-11",
-      "tanggal": "2026-11-12",
-      "jenis": "masuk",
-      "kategori": "Iuran Kas",
-      "nominal": 95000,
-      "keterangan": "Iuran Kas Minggu 7 (19 mahasiswa)"
+      "nominal": 5500,
+      "keterangan": "Print kertas attendence"
     }
   ],
   "iuranMahasiswa": {
-    "Abdullah Azzam Hibatullah": 8,
-    "Saskia Tifani Amelia": 8,
-    "Alina Yusika Safitri": 8,
-    "Shasya Aurellia Azzahra": 8,
-    "Rihana Shafira Azzalia": 8,
-    "Fauzan Aqeelah Ghazi Rabbani": 8,
-    "Ryandra Alifah Hafizd": 8,
-    "Davin Zoe Akhmad": 7,
-    "Atiyah Dinar Aliyah": 8,
-    "Raditya Jeremia Kriswanto Putra": 6,
-    "Christoper Natanael Partogi Panjaitan": 8,
-    "Atika Meilinda": 7,
-    "Favian Zada Putra": 8,
-    "Afghan Yazid Ilmany": 6,
-    "Arven Hael Viscaya Atjeh": 7,
-    "Hants Immanuel Marito Hutauruk": 8,
-    "Muhammad Hilmi Mu'Afa": 8,
-    "Marvin Febrian Agyantra": 7,
-    "Mohammad Aditya Arkoun": 6,
-    "Nawfal Rayhan Subagyo": 8,
-    "Sifa Luvena Taufiqah Palupi": 8,
-    "Elyka Imelda Mayzananda": 8,
-    "Tirta Prasetya Kusuma Wardana": 7,
-    "Ghazi Silkaputera Hanania": 8
+    "Abdullah Azzam Hibatullah": 0,
+    "Saskia Tifani Amelia": 0,
+    "Alina Yusika Safitri": 1,
+    "Shasya Aurellia Azzahra": 0,
+    "Rihana Shafira Azzalia": 1,
+    "Fauzan Aqeelah Ghazi Rabbani": 0,
+    "Ryandra Alifah Hafizd": 0,
+    "Davin Zoe Akhmad": 0,
+    "Atiyah Dinar Aliyah": 0,
+    "Raditya Jeremia Kriswanto Putra": 0,
+    "Christoper Natanael Partogi Panjaitan": 0,
+    "Atika Meilinda": 0,
+    "Favian Zada Putra": 0,
+    "Afghan Yazid Ilmany": 0,
+    "Arven Hael Viscaya Atjeh": 0,
+    "Hants Immanuel Marito Hutauruk": 0,
+    "Muhammad Hilmi Mu'Afa": 3,
+    "Marvin Febrian Agyantra": 0,
+    "Mohammad Aditya Arkoun": 0,
+    "Nawfal Rayhan Subagyo": 0,
+    "Sifa Luvena Taufiqah Palupi": 0,
+    "Elyka Imelda Mayzananda": 0,
+    "Tirta Prasetya Kusuma Wardana": 0,
+    "Ghazi Silkaputera Hanania": 4
   }
 };
