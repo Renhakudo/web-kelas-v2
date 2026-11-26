@@ -36,8 +36,9 @@ window.DATA.appwrite = {
     "attachments": "sdta_storage"
   },
 
-  // ID Appwrite Functions (opsional, untuk reset password dari dashboard Admin)
+  // ID Appwrite Functions (opsional, isi dengan Function ID setelah deploy di Appwrite Console)
   "functions": {
-    "adminResetPassword": ""
+    "adminResetPassword": "",
+    "kasSyncSheets": "6b07daf20013b94efa34"
   }
 };

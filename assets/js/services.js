@@ -523,7 +523,7 @@
   }
 
   // ==========================================
-  // 6. UANG KAS (TRANSAKSI, IURAN, SKIP BULAN)
+  // 6. UANG KAS (TRANSAKSI, IURAN, SKIP BULAN, TWO-WAY SYNC)
   // ==========================================
   async function listCashTransactions() {
     if (!isConfigured || !appwrite.databases) return null;
@@ -531,7 +531,7 @@
       const res = await appwrite.databases.listDocuments(
         dbId,
         cols.cash_transactions || 'cash_transactions',
-        [window.Appwrite.Query.limit(200), window.Appwrite.Query.orderDesc('tanggal')]
+        [window.Appwrite.Query.limit(250), window.Appwrite.Query.orderDesc('tanggal')]
       );
       return res.documents || [];
     } catch (err) {
@@ -540,32 +540,166 @@
     }
   }
 
+  function buildCashTxPermissions() {
+    return [
+      window.Appwrite.Permission.read(window.Appwrite.Role.users()),
+      window.Appwrite.Permission.update(window.Appwrite.Role.label('admin')),
+      window.Appwrite.Permission.update(window.Appwrite.Role.label('pengurus')),
+      window.Appwrite.Permission.delete(window.Appwrite.Role.label('admin')),
+      window.Appwrite.Permission.delete(window.Appwrite.Role.label('pengurus'))
+    ];
+  }
+
+  function isUnknownAttrError(err) {
+    const msg = String((err && err.message) || err || '').toLowerCase();
+    return msg.includes('unknown attribute') || msg.includes('invalid document structure');
+  }
+
   async function createCashTransaction(data) {
     if (!isConfigured || !appwrite.databases) return null;
+    const auth = window.SDT && window.SDT.auth;
+    const userId = (auth && auth.state && auth.state.user && auth.state.user.$id) || '';
+    const txId = String(data.transaction_id || `trx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    const fullPayload = {
+      transaction_id: txId,
+      tanggal: data.tanggal,
+      jenis: data.jenis,
+      kategori: data.kategori,
+      nominal: Number(data.nominal || 0),
+      keterangan: data.keterangan,
+      mahasiswa_nama: data.mahasiswa_nama || '',
+      status: data.status || 'aktif',
+      source: 'website',
+      updated_at: data.updated_at || new Date().toISOString(),
+      sync_status: 'pending',
+      created_by: userId
+    };
+    const corePayload = {
+      tanggal: data.tanggal,
+      jenis: data.jenis,
+      kategori: data.kategori,
+      nominal: Number(data.nominal || 0),
+      keterangan: data.keterangan
+    };
+    const colId = cols.cash_transactions || 'cash_transactions';
+    const safeDocId = /^[a-zA-Z0-9._-]{1,36}$/.test(txId) ? txId : window.Appwrite.ID.unique();
     try {
-      return await appwrite.databases.createDocument(
+      return await appwrite.databases.createDocument(dbId, colId, safeDocId, fullPayload, buildCashTxPermissions());
+    } catch (err) {
+      if (isUnknownAttrError(err)) {
+        // Fallback aman bila skema Appwrite belum ditambah atribut sinkronisasi terbaru
+        const doc = await appwrite.databases.createDocument(dbId, colId, safeDocId, corePayload, buildCashTxPermissions());
+        doc._legacySchemaFallback = true;
+        return doc;
+      }
+      throw new Error(appwrite.terjemahkanError(err));
+    }
+  }
+
+  async function updateCashTransaction(docId, data) {
+    if (!isConfigured || !appwrite.databases || !docId) return null;
+    const colId = cols.cash_transactions || 'cash_transactions';
+    const fullPayload = {
+      tanggal: data.tanggal,
+      jenis: data.jenis,
+      kategori: data.kategori,
+      nominal: Number(data.nominal || 0),
+      keterangan: data.keterangan,
+      mahasiswa_nama: data.mahasiswa_nama || '',
+      status: data.status || 'aktif',
+      source: 'website',
+      updated_at: data.updated_at || new Date().toISOString(),
+      sync_status: 'pending'
+    };
+    if (data.transaction_id) fullPayload.transaction_id = data.transaction_id;
+    const corePayload = {
+      tanggal: data.tanggal,
+      jenis: data.jenis,
+      kategori: data.kategori,
+      nominal: Number(data.nominal || 0),
+      keterangan: data.keterangan
+    };
+    try {
+      return await appwrite.databases.updateDocument(dbId, colId, docId, fullPayload);
+    } catch (err) {
+      if (isUnknownAttrError(err)) {
+        const doc = await appwrite.databases.updateDocument(dbId, colId, docId, corePayload);
+        doc._legacySchemaFallback = true;
+        return doc;
+      }
+      throw new Error(appwrite.terjemahkanError(err));
+    }
+  }
+
+  async function upsertCashTransaction(data) {
+    if (!isConfigured || !appwrite.databases) return null;
+    const txId = String(data.transaction_id || '').trim();
+    const colId = cols.cash_transactions || 'cash_transactions';
+    if (txId) {
+      try {
+        await appwrite.databases.getDocument(dbId, colId, txId);
+        return await updateCashTransaction(txId, data);
+      } catch {}
+    }
+    return await createCashTransaction(data);
+  }
+
+  async function softDeleteCashTransaction(docId) {
+    if (!isConfigured || !appwrite.databases || !docId) return null;
+    const colId = cols.cash_transactions || 'cash_transactions';
+    try {
+      return await appwrite.databases.updateDocument(
         dbId,
-        cols.cash_transactions || 'cash_transactions',
-        window.Appwrite.ID.unique(),
-        data,
-        [
-          window.Appwrite.Permission.read(window.Appwrite.Role.any()),
-          window.Appwrite.Permission.write(window.Appwrite.Role.users()),
-          window.Appwrite.Permission.delete(window.Appwrite.Role.users())
-        ]
+        colId,
+        docId,
+        {
+          status: 'deleted',
+          source: 'website',
+          updated_at: new Date().toISOString(),
+          sync_status: 'pending'
+        }
       );
     } catch (err) {
+      if (isUnknownAttrError(err)) {
+        await appwrite.databases.deleteDocument(dbId, colId, docId);
+        return { $id: docId, status: 'deleted', _legacySchemaFallback: true };
+      }
       throw new Error(appwrite.terjemahkanError(err));
     }
   }
 
   async function deleteCashTransaction(id) {
-    if (!isConfigured || !appwrite.databases || !id) return;
-    try {
-      await appwrite.databases.deleteDocument(dbId, cols.cash_transactions || 'cash_transactions', id);
-    } catch (err) {
-      throw new Error(appwrite.terjemahkanError(err));
+    return softDeleteCashTransaction(id);
+  }
+
+  async function invokeKasSync(action, payload = {}) {
+    const funcId = config.functions && config.functions.kasSyncSheets;
+    if (!isConfigured || !appwrite.functions || !funcId) {
+      return { ok: false, skipped: true, reason: 'FUNCTION_NOT_CONFIGURED' };
     }
+    const maxRetries = 2;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const exec = await appwrite.functions.createExecution(
+          funcId,
+          JSON.stringify({ action, ...payload }),
+          false
+        );
+        let body = {};
+        try { body = JSON.parse(exec.responseBody || '{}'); } catch {}
+        if (exec.status === 'failed' || body.ok === false) {
+          throw new Error(body.message || 'Eksekusi sinkronisasi gagal.');
+        }
+        return body;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 400 * attempt));
+        }
+      }
+    }
+    throw new Error(appwrite.terjemahkanError(lastErr));
   }
 
   async function listCashPayments() {
@@ -753,7 +887,11 @@
     // Kas
     listCashTransactions,
     createCashTransaction,
+    updateCashTransaction,
+    upsertCashTransaction,
+    softDeleteCashTransaction,
     deleteCashTransaction,
+    invokeKasSync,
     listCashPayments,
     upsertCashPayment,
     listCashMonthSettings,

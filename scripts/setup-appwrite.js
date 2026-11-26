@@ -172,11 +172,18 @@ async function main() {
       { col: 'assignments', type: 'string', key: 'link_pengumpulan', size: 500, req: false },
 
       // cash_transactions
+      { col: 'cash_transactions', type: 'string', key: 'transaction_id', size: 64, req: false },
       { col: 'cash_transactions', type: 'string', key: 'tanggal', size: 30, req: true },
       { col: 'cash_transactions', type: 'string', key: 'jenis', size: 20, req: true },
       { col: 'cash_transactions', type: 'string', key: 'kategori', size: 50, req: true },
       { col: 'cash_transactions', type: 'integer', key: 'nominal', req: true, min: 0 },
       { col: 'cash_transactions', type: 'string', key: 'keterangan', size: 255, req: true },
+      { col: 'cash_transactions', type: 'string', key: 'mahasiswa_nama', size: 100, req: false },
+      { col: 'cash_transactions', type: 'string', key: 'status', size: 20, req: false, def: 'aktif' },
+      { col: 'cash_transactions', type: 'string', key: 'source', size: 20, req: false, def: 'website' },
+      { col: 'cash_transactions', type: 'string', key: 'updated_at', size: 40, req: false },
+      { col: 'cash_transactions', type: 'string', key: 'sync_status', size: 20, req: false, def: 'pending' },
+      { col: 'cash_transactions', type: 'string', key: 'created_by', size: 60, req: false },
 
       // cash_payments
       { col: 'cash_payments', type: 'string', key: 'user_id', size: 50, req: true },
@@ -262,6 +269,20 @@ async function main() {
     // Tunggu beberapa detik agar Appwrite selesai memproses status atribut menjadi 'available'
     console.log('\n  -> Menunggu sinkronisasi atribut Appwrite...');
     await new Promise((r) => setTimeout(r, 4000));
+
+    // Buat indeks unik untuk transaction_id pada cash_transactions agar lookup upsert cepat
+    try {
+      await request(endpoint, apiKey, projectId, `/databases/${databaseId}/collections/cash_transactions/indexes`, 'POST', {
+        key: 'idx_transaction_id',
+        type: 'unique',
+        attributes: ['transaction_id']
+      });
+      console.log('  + [cash_transactions] Indeks unik "idx_transaction_id" dibuat.');
+    } catch (idxErr) {
+      if (!String(idxErr.message || '').includes('409') && !String(idxErr.message || '').toLowerCase().includes('already exists')) {
+        console.log(`  ! [cash_transactions] Info indeks transaction_id: ${idxErr.message}`);
+      }
+    }
 
     // Storage Bucket: Gunakan 1 bucket terpadu untuk semua file (foto profil, lampiran, bukti kas)
     // agar kompatibel dengan limit Free Plan Appwrite (1 bucket per project).

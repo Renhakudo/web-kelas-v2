@@ -1,0 +1,6 @@
+{
+  "name": "kas-sync-sheets",
+  "version": "1.0.0",
+  "description": "Appwrite Function Two-Way Sync antara Kas Appwrite (Single Source of Truth) dan Google Sheets",
+  "main": "src/main.js"
+}

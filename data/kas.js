@@ -1,5 +1,5 @@
 // Data kas real kelas Sains Data Terapan A (berdasarkan kas SDT A.xlsx).
-// Berisi nominal iuran bulanan, rekening pembayaran bendahara, transaksi real, dan status iuran.
+// Menggunakan transaction_id kanonik per-bulan (iuran-<nrp>-<YYYY-MM>) agar sinkron 1-ke-1 dengan checkbox Sheet1.
 window.DATA = window.DATA || {};
 window.DATA.kas = {
   "nominalBulanan": 15000,
@@ -28,44 +28,134 @@ window.DATA.kas = {
   "catatanPembayaran": "Format berita transfer: KAS_[NAMA]_[BULAN]. Kirim bukti transfer via WhatsApp ke Bendahara.",
   "transaksi": [
     {
-      "id": "trx-real-01",
-      "tanggal": "2026-09-15",
+      "id": "iuran-3326600006-2026-09",
+      "transaction_id": "iuran-3326600006-2026-09",
+      "tanggal": "2026-09-01",
       "jenis": "masuk",
       "kategori": "Iuran Kas",
       "nominal": 15000,
-      "keterangan": "Iuran Kas - Alina Yusika Safitri (Sep 2026)"
+      "keterangan": "Iuran Kas - Alina Yusika Safitri (Sep 2026)",
+      "mahasiswa_nama": "Alina Yusika Safitri",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-15T10:00:00.000Z"
     },
     {
-      "id": "trx-real-02",
-      "tanggal": "2026-09-15",
+      "id": "iuran-3326600001-2026-09",
+      "transaction_id": "iuran-3326600001-2026-09",
+      "tanggal": "2026-09-01",
       "jenis": "masuk",
       "kategori": "Iuran Kas",
       "nominal": 15000,
-      "keterangan": "Iuran Kas - Rihana Shafira Azzalia (Sep 2026)"
+      "keterangan": "Iuran Kas - Rihana Shafira Azzalia (Sep 2026)",
+      "mahasiswa_nama": "Rihana Shafira Azzalia",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-15T10:00:00.000Z"
     },
     {
-      "id": "trx-real-03",
-      "tanggal": "2026-09-20",
+      "id": "iuran-3326600024-2026-09",
+      "transaction_id": "iuran-3326600024-2026-09",
+      "tanggal": "2026-09-01",
       "jenis": "masuk",
       "kategori": "Iuran Kas",
-      "nominal": 60000,
-      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Sep–Des 2026, 4 bulan)"
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Sep 2026)",
+      "mahasiswa_nama": "Ghazi Silkaputera Hanania",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-20T10:00:00.000Z"
     },
     {
-      "id": "trx-real-04",
-      "tanggal": "2026-09-25",
+      "id": "iuran-3326600024-2026-10",
+      "transaction_id": "iuran-3326600024-2026-10",
+      "tanggal": "2026-10-01",
       "jenis": "masuk",
       "kategori": "Iuran Kas",
-      "nominal": 45000,
-      "keterangan": "Iuran Kas - Muhammad Hilmi Mu'Afa (Sep–Nov 2026, 3 bulan)"
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Okt 2026)",
+      "mahasiswa_nama": "Ghazi Silkaputera Hanania",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-20T10:00:00.000Z"
     },
     {
-      "id": "trx-real-05",
+      "id": "iuran-3326600024-2026-11",
+      "transaction_id": "iuran-3326600024-2026-11",
+      "tanggal": "2026-11-01",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Nov 2026)",
+      "mahasiswa_nama": "Ghazi Silkaputera Hanania",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-20T10:00:00.000Z"
+    },
+    {
+      "id": "iuran-3326600024-2026-12",
+      "transaction_id": "iuran-3326600024-2026-12",
+      "tanggal": "2026-12-01",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Ghazi Silkaputera Hanania (Des 2026)",
+      "mahasiswa_nama": "Ghazi Silkaputera Hanania",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-20T10:00:00.000Z"
+    },
+    {
+      "id": "iuran-3326600014-2026-09",
+      "transaction_id": "iuran-3326600014-2026-09",
+      "tanggal": "2026-09-01",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Muhammad Hilmi Mu'Afa (Sep 2026)",
+      "mahasiswa_nama": "Muhammad Hilmi Mu'Afa",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-25T10:00:00.000Z"
+    },
+    {
+      "id": "iuran-3326600014-2026-10",
+      "transaction_id": "iuran-3326600014-2026-10",
+      "tanggal": "2026-10-01",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Muhammad Hilmi Mu'Afa (Okt 2026)",
+      "mahasiswa_nama": "Muhammad Hilmi Mu'Afa",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-25T10:00:00.000Z"
+    },
+    {
+      "id": "iuran-3326600014-2026-11",
+      "transaction_id": "iuran-3326600014-2026-11",
+      "tanggal": "2026-11-01",
+      "jenis": "masuk",
+      "kategori": "Iuran Kas",
+      "nominal": 15000,
+      "keterangan": "Iuran Kas - Muhammad Hilmi Mu'Afa (Nov 2026)",
+      "mahasiswa_nama": "Muhammad Hilmi Mu'Afa",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-09-25T10:00:00.000Z"
+    },
+    {
+      "id": "trx-exp-row-6",
+      "transaction_id": "trx-exp-row-6",
       "tanggal": "2026-10-02",
       "jenis": "keluar",
       "kategori": "ATK & Kelas",
       "nominal": 5500,
-      "keterangan": "Print kertas attendence"
+      "keterangan": "Print kertas attendence",
+      "mahasiswa_nama": "",
+      "status": "aktif",
+      "source": "website",
+      "updated_at": "2026-10-02T10:00:00.000Z"
     }
   ],
   "iuranMahasiswa": {

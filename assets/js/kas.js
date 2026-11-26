@@ -125,12 +125,15 @@
     document.body.removeChild(ta);
   }
 
+  const activeTransaksi = (state) => (state.transaksi || []).filter((t) => t.status !== "deleted");
+
   // Komponen Ringkasan Saldo (Header Kas)
   function renderSummary(state, totalMhs, totalLunas) {
-    const totalMasuk = state.transaksi
+    const active = activeTransaksi(state);
+    const totalMasuk = active
       .filter((t) => t.jenis === "masuk")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
-    const totalKeluar = state.transaksi
+    const totalKeluar = active
       .filter((t) => t.jenis === "keluar")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
     const saldo = totalMasuk - totalKeluar;
@@ -147,12 +150,12 @@
         <div class="kas-card in">
           <span class="kas-card-label">Total Pemasukan</span>
           <div class="kas-card-val">+${rupiah(totalMasuk)}</div>
-          <p class="kas-card-sub">${state.transaksi.filter((t) => t.jenis === "masuk").length} transaksi</p>
+          <p class="kas-card-sub">${active.filter((t) => t.jenis === "masuk").length} transaksi</p>
         </div>
         <div class="kas-card out">
           <span class="kas-card-label">Total Pengeluaran</span>
           <div class="kas-card-val">-${rupiah(totalKeluar)}</div>
-          <p class="kas-card-sub">${state.transaksi.filter((t) => t.jenis === "keluar").length} transaksi</p>
+          <p class="kas-card-sub">${active.filter((t) => t.jenis === "keluar").length} transaksi</p>
         </div>
         <div class="kas-card rate">
           <span class="kas-card-label">Kepatuhan Iuran</span>
@@ -188,8 +191,10 @@
   }
 
   // ================= TAB 1: MUTASI TRANSAKSI =================
-  function renderTabMutasi(state, canManage = false) {
-    const list = state.transaksi.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+  function renderTabMutasi(state, canManage = false, mhsList = []) {
+    const list = activeTransaksi(state).slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+    const appwriteCfg = (window.SDT && window.SDT.appwrite && window.SDT.appwrite.config) || {};
+    const hasSyncFunc = Boolean(appwriteCfg.functions && appwriteCfg.functions.kasSyncSheets);
 
     return `
       <div class="kas-toolbar">
@@ -198,22 +203,31 @@
           <button type="button" class="kas-chip" data-filter="masuk"><span>Pemasukan (+)</span></button>
           <button type="button" class="kas-chip" data-filter="keluar"><span>Pengeluaran (-)</span></button>
         </div>
-        ${canManage ? `
-          <div class="kas-actions">
+        <div class="kas-actions" style="display:flex;gap:.4rem;flex-wrap:wrap;">
+          <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-refresh-kas" title="Muat ulang data terbaru dari Appwrite">
+            <span>↻ Muat Ulang</span>
+          </button>
+          ${canManage && hasSyncFunc ? `
+            <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-sync-sheets" title="Sinkronisasi dua arah dengan Google Sheets">
+              <span>☁️ Sync Sheets</span>
+            </button>
+          ` : ""}
+          ${canManage ? `
             <button type="button" class="kas-btn kas-btn-primary" id="btn-toggle-form">
               <span>+ Catat Transaksi</span>
             </button>
-          </div>
-        ` : ""}
+          ` : ""}
+        </div>
       </div>
 
-      <!-- Form Catat Transaksi Baru (sembunyi bawaan) -->
+      <!-- Form Catat / Edit Transaksi (sembunyi bawaan) -->
       ${canManage ? `
         <div class="kas-form-card" id="form-transaksi" style="display:none;" aria-hidden="true">
           <div class="kas-form-head">
-            <h3>Catat Transaksi Kas Baru</h3>
+            <h3 id="trx-form-title">Catat Transaksi Kas Baru</h3>
             <button type="button" class="kas-btn kas-btn-sm kas-btn-outline" id="btn-batal-form"><span>Tutup</span></button>
           </div>
+          <input type="hidden" id="trx-edit-id" value="">
           <div class="kas-form-grid">
             <div class="kas-field">
               <label for="trx-jenis">Jenis Transaksi</label>
@@ -236,15 +250,22 @@
             </div>
             <div class="kas-field">
               <label for="trx-nominal">Nominal (Rp)</label>
-              <input class="kas-input" id="trx-nominal" type="number" min="1000" step="1000" placeholder="contoh: 25000" required>
+              <input class="kas-input" id="trx-nominal" type="number" min="0" step="500" placeholder="contoh: 15000" required>
             </div>
             <div class="kas-field">
               <label for="trx-tanggal">Tanggal</label>
               <input class="kas-input" id="trx-tanggal" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
             </div>
-            <div class="kas-field" style="grid-column: 1 / -1;">
+            <div class="kas-field">
+              <label for="trx-mahasiswa">Identitas Mahasiswa (Opsional)</label>
+              <select class="kas-select" id="trx-mahasiswa">
+                <option value="">-- Umum / Non-Mahasiswa --</option>
+                ${mhsList.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="kas-field">
               <label for="trx-ket">Keterangan / Keperluan</label>
-              <input class="kas-input" id="trx-ket" type="text" placeholder="contoh: Beli 2 spidol snowman & penghapus" required>
+              <input class="kas-input" id="trx-ket" type="text" placeholder="contoh: Iuran Kas Sep 2026 / Print kertas" required>
             </div>
           </div>
           <div class="kas-form-foot">
@@ -253,8 +274,13 @@
         </div>
       ` : ""}
 
-      <input class="search" id="cari-trx" type="search" placeholder="Cari keterangan atau kategori transaksi\u2026" autocomplete="off" spellcheck="false">
-      <p class="count" id="count-trx" aria-live="polite">${list.length} transaksi tercatat</p>
+      <input class="search" id="cari-trx" type="search" placeholder="Cari keterangan, kategori, atau nama mahasiswa\u2026" autocomplete="off" spellcheck="false">
+      ${state.lastSyncError ? `
+        <div class="auth-error show" id="kas-sync-alert" style="margin:.6rem 0;">
+          <b>Catatan Sinkronisasi:</b> ${esc(state.lastSyncError)}
+        </div>
+      ` : ""}
+      <p class="count" id="count-trx" aria-live="polite">${list.length} transaksi aktif tercatat</p>
 
       <ul class="kas-trx-list" id="trx-items">
         ${renderTrxItems(list, canManage)}
@@ -268,6 +294,16 @@
     }
     return list.map((t, i) => {
       const isMasuk = t.jenis === "masuk";
+      const srcTag = t.source === "sheets" ? `<span class="kas-badge" style="background:rgba(77,251,167,.15);color:#4dfba7;font-size:.6rem;margin-left:.3rem;">Sheets</span>` : "";
+      const syncTag = t.appwrite_saved === false
+        ? `<span class="kas-badge out" style="font-size:.6rem;margin-left:.3rem;">Lokal (Belum di Cloud)</span>`
+        : t.sync_status === "failed"
+        ? `<span class="kas-badge out" style="font-size:.6rem;margin-left:.3rem;">Sync Gagal</span>`
+        : t.sync_status === "synced"
+        ? `<span class="kas-badge in" style="font-size:.6rem;margin-left:.3rem;">Synced</span>`
+        : t.sync_status === "pending"
+        ? `<span class="kas-badge" style="background:rgba(255,213,79,.15);color:#ffd54f;font-size:.6rem;margin-left:.3rem;">Pending</span>`
+        : "";
       return `
         <li class="kas-trx-item ${isMasuk ? 'in' : 'out'}" data-jenis="${esc(t.jenis)}" data-id="${esc(t.id)}" style="--i:${i}">
           <div class="kas-trx-date">
@@ -275,13 +311,18 @@
             <span class="kas-badge ${isMasuk ? 'in' : 'out'}">${isMasuk ? 'Masuk' : 'Keluar'}</span>
           </div>
           <div class="kas-trx-desc">
-            <h4>${esc(t.keterangan)}</h4>
-            <p>${esc(t.kategori)}</p>
+            <h4>${esc(t.keterangan)}${srcTag}${syncTag}</h4>
+            <p>${esc(t.kategori)}${t.mahasiswa_nama ? ` &bull; <b style="color:var(--aqua);">${esc(t.mahasiswa_nama)}</b>` : ""}</p>
           </div>
           <div class="kas-trx-amount ${isMasuk ? 'in' : 'out'}">
             ${isMasuk ? '+' : '-'}${rupiah(t.nominal)}
           </div>
-          ${canManage ? `<button type="button" class="kas-btn-del" data-del="${esc(t.id)}" title="Hapus transaksi" aria-label="Hapus transaksi ${esc(t.keterangan)}">Hapus</button>` : ""}
+          ${canManage ? `
+            <div style="display:flex;gap:.35rem;">
+              <button type="button" class="kas-btn-del kas-btn-edit" data-edit="${esc(t.id)}" style="border-color:var(--aqua);color:var(--aqua);" title="Edit transaksi">Edit</button>
+              <button type="button" class="kas-btn-del" data-del="${esc(t.id)}" title="Hapus transaksi (soft delete)" aria-label="Hapus transaksi ${esc(t.keterangan)}">Hapus</button>
+            </div>
+          ` : ""}
         </li>
       `;
     }).join("");
@@ -527,15 +568,16 @@
 
   // ================= TAB 4: LAPORAN & STATISTIK =================
   function renderTabLaporan(state, mhsList) {
+    const active = activeTransaksi(state);
     const target = state.targetBulan || 3;
     const nominal = state.nominalBulanan || 15000;
     const targetPerMhs = target * nominal;
     const totalTargetKelas = mhsList.length * targetPerMhs;
 
-    const totalMasuk = state.transaksi
+    const totalMasuk = active
       .filter((t) => t.jenis === "masuk")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
-    const totalKeluar = state.transaksi
+    const totalKeluar = active
       .filter((t) => t.jenis === "keluar")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
     const saldo = totalMasuk - totalKeluar;
@@ -551,7 +593,7 @@
 
     // Breakdown per kategori pengeluaran
     const catMap = {};
-    state.transaksi
+    active
       .filter((t) => t.jenis === "keluar")
       .forEach((t) => {
         const cat = t.kategori || "Lainnya";
@@ -639,14 +681,15 @@
 
   // ================= GENERATOR FORMAT WHATSAPP =================
   function generateWaRecap(state, mhsList) {
+    const active = activeTransaksi(state);
     const target = state.targetBulan || 3;
     const nominal = state.nominalBulanan || 15000;
     const targetRp = target * nominal;
 
-    const totalMasuk = state.transaksi
+    const totalMasuk = active
       .filter((t) => t.jenis === "masuk")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
-    const totalKeluar = state.transaksi
+    const totalKeluar = active
       .filter((t) => t.jenis === "keluar")
       .reduce((acc, t) => acc + Number(t.nominal || 0), 0);
     const saldo = totalMasuk - totalKeluar;
@@ -702,10 +745,12 @@
     csv += `Tanggal Unduh,${new Date().toISOString().slice(0, 10)}\r\n\r\n`;
 
     csv += "BAGIAN 1: MUTASI TRANSAKSI\r\n";
-    csv += "ID,Tanggal,Jenis,Kategori,Keterangan,Nominal\r\n";
-    state.transaksi.forEach((t) => {
+    csv += "ID Transaksi,Tanggal,Jenis,Kategori,Mahasiswa,Keterangan,Nominal,Sumber,Updated At\r\n";
+    activeTransaksi(state).forEach((t) => {
       const nom = (t.jenis === "keluar" ? "-" : "+") + t.nominal;
-      csv += `"${t.id}","${t.tanggal}","${t.jenis}","${t.kategori}","${t.keterangan.replace(/"/g, '""')}","${nom}"\r\n`;
+      const txId = t.transaction_id || t.id;
+      const mhs = (t.mahasiswa_nama || "").replace(/"/g, '""');
+      csv += `"${txId}","${t.tanggal}","${t.jenis}","${t.kategori}","${mhs}","${t.keterangan.replace(/"/g, '""')}","${nom}","${t.source || 'website'}","${t.updated_at || ''}"\r\n`;
     });
 
     csv += "\r\nBAGIAN 2: STATUS IURAN MAHASISWA\r\n";
@@ -744,7 +789,7 @@
 
     let tabHtml = "";
     if (activeTab === "mutasi") {
-      tabHtml = renderTabMutasi(state, canManage);
+      tabHtml = renderTabMutasi(state, canManage, mhsList);
     } else if (activeTab === "iuran") {
       tabHtml = renderTabIuran(state, mhsList, canManage);
     } else if (activeTab === "rekening") {
@@ -766,49 +811,123 @@
       html,
       after(body) {
         const services = window.SDT && window.SDT.services;
+        const appwrite = window.SDT && window.SDT.appwrite;
+        window.SDT._kasActiveTab = activeTab;
+        window.SDT._kasRerender = rerender;
+        window.SDT._kasDefaultData = data;
 
-        // Sinkronisasi latar belakang dari Appwrite (hanya sekali per sesi panel agar tidak loop)
-        if (services && !window.SDT._kasSynced) {
-          window.SDT._kasSynced = true;
-          Promise.all([
+        const pullLatestFromAppwrite = () => {
+          if (!services) return Promise.resolve(false);
+          const curState = getState(
+            (window.SDT._kasDefaultData && window.SDT._kasDefaultData.kas) || data.kas,
+            (window.SDT._kasDefaultData && window.SDT._kasDefaultData.anggota) || data.anggota
+          );
+          return Promise.all([
             services.listCashTransactions(),
             services.listCashMonthSettings(),
             services.listCashPayments()
           ]).then(([trxDocs, skipDocs, payDocs]) => {
             let changed = false;
+            if (Array.isArray(payDocs) && payDocs.length > 0) {
+              const nomBln = curState.nominalBulanan || 15000;
+              payDocs.forEach((p) => {
+                if (p.user_id && p.periode_bulan === "TOTAL") {
+                  curState.iuranMahasiswa[p.user_id] = Math.round(Number(p.nominal_dibayar || 0) / nomBln);
+                  changed = true;
+                }
+              });
+            }
             if (Array.isArray(trxDocs) && trxDocs.length > 0) {
-              state.transaksi = trxDocs.map((d) => ({
+              // Pertahankan transaksi lokal yang belum sempat tersimpan ke Cloud agar tidak hilang saat Muat Ulang
+              const unsavedLocal = (curState.transaksi || []).filter((t) => t.appwrite_saved === false);
+              const cloudTxs = trxDocs.map((d) => ({
                 id: d.$id,
+                transaction_id: d.transaction_id || d.$id,
                 tanggal: d.tanggal,
                 jenis: d.jenis,
                 kategori: d.kategori,
                 nominal: d.nominal,
-                keterangan: d.keterangan
+                keterangan: d.keterangan,
+                mahasiswa_nama: d.mahasiswa_nama || "",
+                status: d.status || "aktif",
+                source: d.source || "website",
+                updated_at: d.updated_at || d.$updatedAt || "",
+                sync_status: d.sync_status || "synced",
+                appwrite_saved: true
               }));
+              const merged = [...cloudTxs];
+              unsavedLocal.forEach((loc) => {
+                if (!merged.some((c) => c.transaction_id === loc.transaction_id || c.id === loc.id)) {
+                  merged.unshift(loc);
+                }
+              });
+              curState.transaksi = merged;
+
+              // Rekonsiliasi hitung bulan iuran dari transaksi Iuran Kas aktif (termasuk centang/hapus centang dari Sheet1)
+              const nomBln = curState.nominalBulanan || 15000;
+              const iuranTotals = {};
+              merged.forEach((t) => {
+                if (t.mahasiswa_nama && (t.kategori === "Iuran Kas" || String(t.transaction_id || "").startsWith("iuran-"))) {
+                  if (iuranTotals[t.mahasiswa_nama] === undefined) {
+                    iuranTotals[t.mahasiswa_nama] = 0;
+                  }
+                  if (t.status !== "deleted" && t.jenis === "masuk") {
+                    iuranTotals[t.mahasiswa_nama] += Number(t.nominal || 0);
+                  }
+                }
+              });
+              Object.entries(iuranTotals).forEach(([nama, totalRp]) => {
+                curState.iuranMahasiswa[nama] = Math.round(totalRp / nomBln);
+              });
               changed = true;
             }
             if (Array.isArray(skipDocs) && skipDocs.length > 0) {
-              state.skipBulan = skipDocs.filter((s) => s.is_skipped !== false).map((s) => ({
+              curState.skipBulan = skipDocs.filter((s) => s.is_skipped !== false).map((s) => ({
                 $id: s.$id,
                 periode: s.periode_bulan,
                 alasan: s.alasan || "Libur Semester"
               }));
               changed = true;
             }
-            if (Array.isArray(payDocs) && payDocs.length > 0) {
-              const nomBln = state.nominalBulanan || 15000;
-              payDocs.forEach((p) => {
-                if (p.user_id && p.periode_bulan === "TOTAL") {
-                  state.iuranMahasiswa[p.user_id] = Math.round(Number(p.nominal_dibayar || 0) / nomBln);
-                  changed = true;
-                }
-              });
-            }
             if (changed) {
-              saveState(state);
-              rerender(activeTab);
+              saveState(curState);
+              const formCardEl = document.getElementById("form-transaksi");
+              const formOpen = Boolean(formCardEl && formCardEl.style.display !== "none");
+              if (!formOpen && document.getElementById("kas-panel-body") && typeof window.SDT._kasRerender === "function") {
+                window.SDT._kasRerender(window.SDT._kasActiveTab || "mutasi");
+              }
             }
-          }).catch(() => {});
+            return changed;
+          }).catch(() => false);
+        };
+
+        // Sinkronisasi awal saat panel Kas dibuka (sekali per sesi)
+        if (services && !window.SDT._kasSynced) {
+          window.SDT._kasSynced = true;
+          pullLatestFromAppwrite();
+        }
+
+        // Appwrite Realtime: otomatis perbarui tampilan web saat ada perubahan dari Google Sheets / admin lain
+        if (appwrite && appwrite.client && typeof appwrite.client.subscribe === "function" && !window.SDT._kasRealtimeUnsub) {
+          try {
+            const dbId = (appwrite.config && appwrite.config.databaseId) || "sdta_db";
+            const colId = (appwrite.config && appwrite.config.collections && appwrite.config.collections.cash_transactions) || "cash_transactions";
+            let rtTimer = null;
+            window.SDT._kasRealtimeUnsub = appwrite.client.subscribe(
+              `databases.${dbId}.collections.${colId}.documents`,
+              (response) => {
+                const payload = response && response.payload;
+                // Abaikan patch status internal ('synced' dari website) agar tidak rerender ganda
+                if (payload && payload.source === "website" && payload.sync_status === "synced") return;
+                clearTimeout(rtTimer);
+                rtTimer = setTimeout(() => {
+                  pullLatestFromAppwrite();
+                }, 450);
+              }
+            );
+          } catch (rtErr) {
+            console.warn("Realtime kas subscribe dilewati:", rtErr);
+          }
         }
 
         // Pasang event listener ganti tab
@@ -827,8 +946,12 @@
         if (activeTab === "mutasi") {
           const btnToggle = body.querySelector("#btn-toggle-form");
           const formCard = body.querySelector("#form-transaksi");
+          const formTitle = body.querySelector("#trx-form-title");
+          const editIdInput = body.querySelector("#trx-edit-id");
           const btnBatal = body.querySelector("#btn-batal-form");
           const btnSimpan = body.querySelector("#btn-simpan-trx");
+          const btnRefresh = body.querySelector("#btn-refresh-kas");
+          const btnSyncSheets = body.querySelector("#btn-sync-sheets");
           const cariInput = body.querySelector("#cari-trx");
           const chipBtns = body.querySelectorAll(".kas-chips .kas-chip");
           const trxItemsContainer = body.querySelector("#trx-items");
@@ -836,13 +959,53 @@
 
           let currentFilter = "semua";
 
+          if (btnRefresh && services) {
+            btnRefresh.addEventListener("click", () => {
+              window.SDT._kasSynced = false;
+              showToast("Memuat data kas terbaru dari Appwrite...");
+              rerender("mutasi");
+            });
+          }
+
+          if (btnSyncSheets && services && services.invokeKasSync) {
+            btnSyncSheets.addEventListener("click", async () => {
+              btnSyncSheets.disabled = true;
+              btnSyncSheets.querySelector("span").textContent = "Menyinkronkan...";
+              try {
+                const pullRes = await services.invokeKasSync("pull_from_sheets");
+                const pushRes = await services.invokeKasSync("push_all");
+                if (pullRes.skipped || pushRes.skipped) {
+                  showToast("Appwrite Function kasSyncSheets belum dikonfigurasi.");
+                } else {
+                  window.SDT._kasSynced = false;
+                  showToast(`Sync selesai (+${pullRes.createdCount || 0} baru, ~${pullRes.updatedCount || 0} ubah dari Sheets).`);
+                  rerender("mutasi");
+                }
+              } catch (err) {
+                showToast("Gagal sinkronisasi Sheets: " + err.message);
+              } finally {
+                btnSyncSheets.disabled = false;
+                btnSyncSheets.querySelector("span").textContent = "☁️ Sync Sheets";
+              }
+            });
+          }
+
           if (btnToggle && formCard) {
             btnToggle.addEventListener("click", () => {
               const open = formCard.style.display !== "none";
-              formCard.style.display = open ? "none" : "block";
-              formCard.setAttribute("aria-hidden", String(open));
-              btnToggle.querySelector("span").textContent = open ? "+ Catat Transaksi" : "Tutup Formulir";
-              if (!open) {
+              if (open) {
+                formCard.style.display = "none";
+                formCard.setAttribute("aria-hidden", "true");
+                btnToggle.querySelector("span").textContent = "+ Catat Transaksi";
+              } else {
+                if (editIdInput) editIdInput.value = "";
+                if (formTitle) formTitle.textContent = "Catat Transaksi Kas Baru";
+                if (body.querySelector("#trx-mahasiswa")) body.querySelector("#trx-mahasiswa").value = "";
+                if (body.querySelector("#trx-nominal")) body.querySelector("#trx-nominal").value = "";
+                if (body.querySelector("#trx-ket")) body.querySelector("#trx-ket").value = "";
+                formCard.style.display = "block";
+                formCard.setAttribute("aria-hidden", "false");
+                btnToggle.querySelector("span").textContent = "Tutup Formulir";
                 setTimeout(() => body.querySelector("#trx-nominal")?.focus(), 50);
               }
             });
@@ -850,6 +1013,7 @@
 
           if (btnBatal && formCard && btnToggle) {
             btnBatal.addEventListener("click", () => {
+              if (editIdInput) editIdInput.value = "";
               formCard.style.display = "none";
               formCard.setAttribute("aria-hidden", "true");
               btnToggle.querySelector("span").textContent = "+ Catat Transaksi";
@@ -858,13 +1022,15 @@
 
           if (btnSimpan) {
             btnSimpan.addEventListener("click", async () => {
+              const editId = editIdInput ? editIdInput.value.trim() : "";
               const jenis = body.querySelector("#trx-jenis").value;
               const kategori = body.querySelector("#trx-kategori").value;
               const nominal = Number(body.querySelector("#trx-nominal").value);
               const tanggalVal = body.querySelector("#trx-tanggal").value;
+              const mhsNama = (body.querySelector("#trx-mahasiswa")?.value || "").trim();
               const keterangan = (body.querySelector("#trx-ket").value || "").trim();
 
-              if (!nominal || nominal <= 0) {
+              if (Number.isNaN(nominal) || nominal <= 0) {
                 alert("Harap masukkan nominal transaksi yang valid.");
                 body.querySelector("#trx-nominal").focus();
                 return;
@@ -875,35 +1041,95 @@
                 return;
               }
 
+              const nowIso = new Date().toISOString();
+              btnSimpan.disabled = true;
+
+              if (editId) {
+                const existingItem = state.transaksi.find((x) => x.id === editId);
+                const txId = (existingItem && existingItem.transaction_id) || editId;
+                const updatedPayload = {
+                  transaction_id: txId,
+                  tanggal: tanggalVal || new Date().toISOString().slice(0, 10),
+                  jenis,
+                  kategori,
+                  nominal,
+                  keterangan,
+                  mahasiswa_nama: mhsNama,
+                  status: "aktif",
+                  source: "website",
+                  updated_at: nowIso,
+                  sync_status: "pending"
+                };
+
+                state.lastSyncError = "";
+                try {
+                  if (services && services.updateCashTransaction) {
+                    const updated = await services.updateCashTransaction(editId, updatedPayload);
+                    updatedPayload.appwrite_saved = true;
+                    if (updated && updated._legacySchemaFallback) {
+                      state.lastSyncError = "Kolom sync di Appwrite belum diperbarui. Jalankan: node scripts/setup-appwrite.js";
+                    }
+                    services.logActivity("kas", "update_transaction", `${txId}: ${rupiah(nominal)} - ${keterangan}`);
+                    const syncRes = await services.invokeKasSync("push_transaction", { transaction: updatedPayload });
+                    if (syncRes && syncRes.ok) updatedPayload.sync_status = "synced";
+                  }
+                } catch (err) {
+                  if (updatedPayload.appwrite_saved !== true) updatedPayload.appwrite_saved = false;
+                  updatedPayload.sync_status = "failed";
+                  state.lastSyncError = err.message;
+                  showToast("Gagal sinkronisasi: " + err.message);
+                }
+
+                if (existingItem) Object.assign(existingItem, updatedPayload);
+                saveState(state);
+                showToast(updatedPayload.appwrite_saved === false ? "Disimpan lokal (gagal simpan ke Appwrite)." : "Transaksi berhasil diperbarui!");
+                rerender("mutasi");
+                return;
+              }
+
+              const txId = `trx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
               const newTrx = {
-                id: "trx-" + Date.now(),
+                id: txId,
+                transaction_id: txId,
                 tanggal: tanggalVal || new Date().toISOString().slice(0, 10),
                 jenis,
                 kategori,
                 nominal,
-                keterangan
+                keterangan,
+                mahasiswa_nama: mhsNama,
+                status: "aktif",
+                source: "website",
+                updated_at: nowIso,
+                sync_status: "pending",
+                appwrite_saved: true
               };
 
-              btnSimpan.disabled = true;
+              state.lastSyncError = "";
+              let savedToAppwrite = false;
               try {
                 if (services && services.createCashTransaction) {
-                  const created = await services.createCashTransaction({
-                    tanggal: newTrx.tanggal,
-                    jenis: newTrx.jenis,
-                    kategori: newTrx.kategori,
-                    nominal: newTrx.nominal,
-                    keterangan: newTrx.keterangan
-                  });
-                  if (created && created.$id) newTrx.id = created.$id;
+                  const created = await services.createCashTransaction(newTrx);
+                  if (created && created.$id) {
+                    newTrx.id = created.$id;
+                    savedToAppwrite = true;
+                  }
+                  if (created && created._legacySchemaFallback) {
+                    state.lastSyncError = "Atribut sync Appwrite belum lengkap. Jalankan: node scripts/setup-appwrite.js";
+                  }
                   services.logActivity("kas", "create_transaction", `${jenis}: ${rupiah(nominal)} - ${keterangan}`);
+                  const syncRes = await services.invokeKasSync("push_transaction", { transaction: newTrx });
+                  if (syncRes && syncRes.ok) newTrx.sync_status = "synced";
                 }
               } catch (err) {
-                showToast("Disimpan lokal (Appwrite: " + err.message + ")");
+                newTrx.appwrite_saved = savedToAppwrite;
+                newTrx.sync_status = "failed";
+                state.lastSyncError = (savedToAppwrite ? "Tersimpan di Appwrite, namun sync ke Sheets gagal: " : "Gagal simpan ke Appwrite: ") + err.message;
+                showToast(state.lastSyncError);
               }
 
               state.transaksi.unshift(newTrx);
               saveState(state);
-              showToast("Transaksi berhasil dicatat!");
+              if (!state.lastSyncError) showToast("Transaksi berhasil dicatat!");
               rerender("mutasi");
             });
           }
@@ -911,15 +1137,16 @@
           // Pasang filter chip
           const applyFilter = () => {
             const q = (cariInput?.value || "").toLowerCase().trim();
-            const filtered = state.transaksi.filter((t) => {
+            const active = activeTransaksi(state);
+            const filtered = active.filter((t) => {
               if (currentFilter === "masuk" && t.jenis !== "masuk") return false;
               if (currentFilter === "keluar" && t.jenis !== "keluar") return false;
-              if (q && !t.keterangan.toLowerCase().includes(q) && !t.kategori.toLowerCase().includes(q)) return false;
+              if (q && !t.keterangan.toLowerCase().includes(q) && !t.kategori.toLowerCase().includes(q) && !(t.mahasiswa_nama || "").toLowerCase().includes(q)) return false;
               return true;
             });
             if (trxItemsContainer) trxItemsContainer.innerHTML = renderTrxItems(filtered, canManage);
-            if (countTrx) countTrx.textContent = `${filtered.length} dari ${state.transaksi.length} transaksi`;
-            pasangDeleteTrx();
+            if (countTrx) countTrx.textContent = `${filtered.length} dari ${active.length} transaksi aktif`;
+            pasangTrxRowActions();
           };
 
           chipBtns.forEach((btn) => {
@@ -935,30 +1162,66 @@
             cariInput.addEventListener("input", applyFilter);
           }
 
-          const pasangDeleteTrx = () => {
-            body.querySelectorAll(".kas-btn-del").forEach((btn) => {
+          const pasangTrxRowActions = () => {
+            body.querySelectorAll(".kas-btn-edit").forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const id = btn.dataset.edit;
+                const item = state.transaksi.find((x) => x.id === id);
+                if (!item || !formCard) return;
+                if (editIdInput) editIdInput.value = item.id;
+                if (formTitle) formTitle.textContent = "Edit Transaksi Kas";
+                body.querySelector("#trx-jenis").value = item.jenis || "masuk";
+                body.querySelector("#trx-kategori").value = item.kategori || "Lainnya";
+                body.querySelector("#trx-nominal").value = item.nominal || 0;
+                body.querySelector("#trx-tanggal").value = item.tanggal || "";
+                if (body.querySelector("#trx-mahasiswa")) body.querySelector("#trx-mahasiswa").value = item.mahasiswa_nama || "";
+                body.querySelector("#trx-ket").value = item.keterangan || "";
+                formCard.style.display = "block";
+                formCard.setAttribute("aria-hidden", "false");
+                formCard.scrollIntoView({ behavior: "smooth" });
+              });
+            });
+
+            body.querySelectorAll(".kas-btn-del:not(.kas-btn-edit)").forEach((btn) => {
               btn.addEventListener("click", async () => {
                 const id = btn.dataset.del;
                 const item = state.transaksi.find((x) => x.id === id);
                 if (!item) return;
-                if (confirm(`Hapus catatan transaksi: "${item.keterangan}" (${rupiah(item.nominal)})?`)) {
+                if (confirm(`Hapus catatan transaksi (soft delete): "${item.keterangan}" (${rupiah(item.nominal)})?`)) {
+                  const nowIso = new Date().toISOString();
+                  item.status = "deleted";
+                  item.source = "website";
+                  item.updated_at = nowIso;
                   try {
-                    if (services && services.deleteCashTransaction && !id.startsWith("trx-")) {
-                      await services.deleteCashTransaction(id);
-                      services.logActivity("kas", "delete_transaction", `${item.keterangan} (${rupiah(item.nominal)})`);
+                    if (services && services.softDeleteCashTransaction) {
+                      await services.softDeleteCashTransaction(id);
+                      services.logActivity("kas", "soft_delete_transaction", `${item.transaction_id || id}: ${item.keterangan}`);
+                      await services.invokeKasSync("push_transaction", {
+                        transaction: {
+                          transaction_id: item.transaction_id || id,
+                          tanggal: item.tanggal,
+                          jenis: item.jenis,
+                          kategori: item.kategori,
+                          nominal: item.nominal,
+                          keterangan: item.keterangan,
+                          mahasiswa_nama: item.mahasiswa_nama || "",
+                          status: "deleted",
+                          source: "website",
+                          updated_at: nowIso
+                        }
+                      });
                     }
                   } catch (err) {
-                    console.warn("Gagal hapus di Appwrite:", err);
+                    console.warn("Gagal soft-delete di Appwrite/Sheets:", err);
                   }
-                  state.transaksi = state.transaksi.filter((x) => x.id !== id);
                   saveState(state);
-                  showToast("Transaksi telah dihapus.");
+                  showToast("Transaksi ditandai terhapus (soft delete).");
                   rerender("mutasi");
                 }
               });
             });
           };
-          pasangDeleteTrx();
+          pasangTrxRowActions();
         }
 
         // ----------------- TAB: IURAN -----------------
@@ -1101,23 +1364,39 @@
             });
           }
 
-          // Pasang tombol kontrol mahasiswa (+1, -1, Lunas)
+          // Pasang tombol kontrol mahasiswa (+1, -1, Lunas) -> sinkron juga dengan checkbox Sheet1
+          const MONTH_SERIES = [
+            { periode: "2026-09", label: "Sep 2026" },
+            { periode: "2026-10", label: "Okt 2026" },
+            { periode: "2026-11", label: "Nov 2026" },
+            { periode: "2026-12", label: "Des 2026" },
+            { periode: "2027-01", label: "Jan 2027" },
+            { periode: "2027-02", label: "Feb 2027" },
+            { periode: "2027-03", label: "Mar 2027" },
+            { periode: "2027-04", label: "Apr 2027" },
+            { periode: "2027-05", label: "Mei 2027" }
+          ];
           const pasangMhsControls = () => {
             body.querySelectorAll(".kas-btn-micro").forEach((btn) => {
-              btn.addEventListener("click", () => {
+              btn.addEventListener("click", async () => {
                 const act = btn.dataset.act;
                 const nama = btn.dataset.nama;
                 const target = state.targetBulan || 3;
-                let val = state.iuranMahasiswa[nama] || 0;
+                const prevVal = state.iuranMahasiswa[nama] || 0;
+                let val = prevVal;
 
-                if (act === "inc") val += 1;
+                if (act === "inc") val = Math.min(MONTH_SERIES.length, val + 1);
                 else if (act === "dec") val = Math.max(0, val - 1);
                 else if (act === "lunas") val = target;
 
                 state.iuranMahasiswa[nama] = val;
                 saveState(state);
+
+                const nomBln = state.nominalBulanan || 15000;
+                const mhsIdx = mhsList.indexOf(nama);
+                const nrp = mhsIdx >= 0 ? String(3326600001 + mhsIdx) : "";
+
                 if (services && services.upsertCashPayment) {
-                  const nomBln = state.nominalBulanan || 15000;
                   services.upsertCashPayment(
                     nama,
                     "TOTAL",
@@ -1125,8 +1404,52 @@
                     val >= target ? "lunas" : "belum_bayar"
                   ).catch(() => {});
                 }
+
+                // Sinkronkan perubahan bulan ke cash_transactions (iuran-<nrp>-<periode>) agar checkbox Sheet1 ikut berubah
+                if (nrp && services && services.upsertCashTransaction) {
+                  const nowIso = new Date().toISOString();
+                  const minM = Math.min(prevVal, val);
+                  const maxM = Math.max(prevVal, val);
+                  for (let idx = minM; idx < maxM && idx < MONTH_SERIES.length; idx++) {
+                    const mInfo = MONTH_SERIES[idx];
+                    const txId = `iuran-${nrp}-${mInfo.periode}`;
+                    const isActive = idx < val;
+                    const txPayload = {
+                      id: txId,
+                      transaction_id: txId,
+                      tanggal: `${mInfo.periode}-01`,
+                      jenis: "masuk",
+                      kategori: "Iuran Kas",
+                      nominal: nomBln,
+                      keterangan: `Iuran Kas - ${nama} (${mInfo.label})`,
+                      mahasiswa_nama: nama,
+                      status: isActive ? "aktif" : "deleted",
+                      source: "website",
+                      updated_at: nowIso,
+                      sync_status: "pending"
+                    };
+                    const localIdx = state.transaksi.findIndex((t) => t.transaction_id === txId || t.id === txId);
+                    if (localIdx >= 0) Object.assign(state.transaksi[localIdx], txPayload);
+                    else state.transaksi.unshift(txPayload);
+                    services.upsertCashTransaction(txPayload)
+                      .then(() => services.invokeKasSync && services.invokeKasSync("push_transaction", { transaction: txPayload }))
+                      .then((syncRes) => {
+                        if (syncRes && syncRes.ok) {
+                          txPayload.sync_status = "synced";
+                          txPayload.appwrite_saved = true;
+                          saveState(state);
+                        }
+                      })
+                      .catch((err) => {
+                        txPayload.sync_status = "failed";
+                        saveState(state);
+                        showToast("Iuran tersimpan lokal, namun gagal auto-sync: " + (err && err.message ? err.message : "Cek koneksi/Function"));
+                      });
+                  }
+                  saveState(state);
+                }
+
                 applyIuranFilter();
-                // Perbarui juga summary bar di atas tanpa reload penuh
                 const summaryEl = body.querySelector(".kas-summary");
                 if (summaryEl) {
                   let lunas = 0;

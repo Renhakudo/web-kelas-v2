@@ -130,16 +130,21 @@ tanggal_bayar: Date
 status: Enum [lunas, kurang, belum_bayar]
 catatan: String
 verified_by: String (User ID Bendahara)
-9. cash_transactions (Buku Mutasi Kas)
+9. cash_transactions (Buku Mutasi Kas & Two-Way Sync)
 
-Catatan pembukuan uang masuk dan keluar secara rinci.
+Catatan pembukuan uang masuk dan keluar secara rinci serta metadata sinkronisasi dua arah ke Google Sheets.
 
-tanggal: Date
+transaction_id: String (unik, terindeks, identitas pencocokan lintas platform)
+tanggal: Date (YYYY-MM-DD)
 jenis: Enum [masuk, keluar]
-kategori: String (contoh: Iuran Mahasiswa, ATK & Kelas, Fotokopi Modul, Konsumsi, Sosial)
+kategori: String (contoh: Iuran Kas, ATK & Kelas, Fotokopi Modul, Konsumsi, Sosial)
 nominal: Integer
 keterangan: String
-bukti_foto_id: String (File ID Appwrite Storage, opsional)
+mahasiswa_nama: String (opsional, identitas mahasiswa terkait)
+status: Enum [aktif, deleted] (soft delete agar sinkronisasi tetap konsisten)
+source: Enum [website, sheets, sync] (pencegahan infinite synchronization loop)
+updated_at: DateTime ISO 8601 (resolusi konflik Last-Write-Wins)
+sync_status: Enum [pending, synced, failed]
 created_by: String (User ID)
 10. summaries (Rangkuman Materi)
 
@@ -250,12 +255,13 @@ Fase 4: Integrasi Fitur Utama (Secara Berurutan)
 4.2 Jadwal & Reschedule: Pembacaan jadwal reguler, sistem penandaan reschedule tanggal berjalan oleh PJ Matkul.
 4.3 Tugas: CRUD tugas, filter matkul, auto-archive tugas lewat deadline.
 4.4 Rangkuman: Editor materi, Activity Log kontributor, dan Version History.
-4.5 Uang Kas: Penyesuaian iuran Rp15.000/bulan, skip bulan libur, mutasi kas, export CSV.
+4.5 Uang Kas: Penyesuaian iuran Rp15.000/bulan mulai September 2026 (data real dari kas SDT A.xlsx), skip bulan libur, CRUD transaksi (tambah, edit, soft delete), export CSV, dan Two-Way Sync langsung ke checkbox `C9:K32` & tabel `LAPORAN PENGELUARAN` (`O5:R100`) pada `Sheet1` (dengan `_Sync_Meta` tersembunyi) melalui Appwrite Function `functions/kas-sync-sheets` + Google Apps Script `scripts/google-apps-script/Code.gs`.
 4.6 Tautan & Pengurus: CRUD tautan berdasarkan kategori, penugasan PJ Matkul pengurus.
 Fase 5 & 6: Penyempurnaan, Pengujian & Siap Rilis
 Pengujian permission setiap role.
 Pengujian responsivitas mobile vs desktop.
 Pengujian graceful offline / fallback handling.
+Pengujian unit/integrasi mock Two-Way Sync Kas (`scripts/test-kas-sync.js`) dan panduan deployment (`scripts/google-apps-script/README.md`).
 
 IMPORTANT
 

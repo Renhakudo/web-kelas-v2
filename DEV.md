@@ -315,20 +315,14 @@ Bulan yang dilewati:
 
 Admin atau pengurus yang berwenang dapat mengatur periode tersebut.
 
-### Integrasi spreadsheet
+### Integrasi spreadsheet (Two-Way Sync)
 
-Saya ingin kemungkinan sinkronisasi laporan kas ke Google Sheets sebagai backup dan rekap tambahan.
+Sinkronisasi dua arah antara fitur Uang Kas (Appwrite sebagai _single source of truth_) dan spreadsheet original **`Sheet1`** (`kas SDT A.xlsx`) telah dirancang serta diimplementasikan secara modular:
 
-Namun, jangan sampai integrasi ini menjadi ketergantungan utama.
-
-Prioritas:
-1. Database Appwrite tetap menjadi sumber data utama.
-2. Ekspor CSV tetap berfungsi.
-3. Evaluasi integrasi Google Sheets menggunakan API atau Appwrite Functions.
-4. Jangan menaruh kredensial Google atau secret di frontend.
-5. Jika integrasi terlalu kompleks atau membutuhkan layanan berbayar, cukup siapkan rancangan untuk pengembangan berikutnya.
-
-Pastikan setiap transaksi memiliki identitas unik agar sinkronisasi tidak menghasilkan data ganda.
+1. Database Appwrite (`cash_transactions`, `cash_payments`, `cash_month_settings`) menjadi sumber data utama dengan ekspor CSV & ringkasan WhatsApp tetap berfungsi penuh, serta mempertahankan transaksi lokal yang belum tersimpan bila terjadi error jaringan/schema (`appwrite_saved: false`).
+2. Setiap transaksi memiliki `transaction_id` unik (termasuk ID deterministik `iuran-<nrp>-<YYYY-MM>` untuk checkbox iuran bulanan `C9:K32` di `Sheet1`), `status` (`aktif` / `deleted` untuk soft delete), penanda asal perubahan (`source`: `website` / `sheets`) dan proteksi loop `.update` (`sync_status === 'synced'`), serta timestamp `updated_at` untuk resolusi konflik.
+3. Appwrite Function `functions/kas-sync-sheets` menjadi jembatan server-side aman menuju Google Apps Script (`scripts/google-apps-script/Code.gs`) tanpa mengekspos API Key Appwrite maupun secret Google di frontend. `Code.gs` membaca & menulis langsung ke checkbox `Sheet1` (`C9:K32`) dan tabel `LAPORAN PENGELUARAN` (`O5:R100`) dengan metadata tersembunyi `_Sync_Meta` (tanpa sheet input manual tambahan).
+4. Dilengkapi validasi payload, fallback kompatibilitas atribut lama di `services.js`, retry dengan exponential backoff, dan pencatatan ke `activity_logs` serta `sync_status`.
 
 ## F. Rangkuman
 
